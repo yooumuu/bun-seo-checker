@@ -68,6 +68,7 @@ export const trackingEvents = pgTable("tracking_events", {
     pageId: integer("page_id").references(() => scanPages.id).notNull(),
     element: text("element"),
     trigger: text("trigger"),
+    eventName: text("event_name"),
     platform: text("platform"), // mixpanel, ga, etc.
     status: text("status"),
 }, (table) => ({

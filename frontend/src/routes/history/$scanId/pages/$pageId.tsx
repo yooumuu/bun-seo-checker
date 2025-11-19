@@ -86,8 +86,8 @@ function PageDetailRoute() {
                 />
               </dl>
             </Card>
-            <Card title="链接与 UTM">
-              <dl className="space-y-3 text-sm">
+          <Card title="链接与 UTM">
+            <dl className="space-y-3 text-sm">
                 <Field
                   label="内部链接"
                   value={page.links?.internalLinks ?? 0}
@@ -101,13 +101,21 @@ function PageDetailRoute() {
                   value={formatPercentage(calculateCoverage(page.links?.utmSummary))}
                 />
                 <Field
+                  label="UTM 已标记链接数"
+                  value={page.links?.utmSummary?.trackedLinks ?? 0}
+                />
+                <Field
+                  label="缺失 UTM 的内部链接"
+                  value={page.links?.utmSummary?.missingUtm ?? 0}
+                />
+                <Field
                   label="跳转 / 异常"
                   value={`${page.links?.redirects ?? 0} / ${
                     page.links?.brokenLinks ?? 0
                   }`}
                 />
               </dl>
-            </Card>
+          </Card>
           </section>
 
           <section className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -119,19 +127,27 @@ function PageDetailRoute() {
                 {page.trackingEvents.map((event) => (
                   <li
                     key={event.id}
-                    className="flex flex-wrap items-center justify-between rounded-lg bg-white/70 px-3 py-2 text-slate-600"
+                    className="rounded-lg bg-white/70 px-3 py-2 text-slate-600"
                   >
-                    <div>
-                      <p className="font-medium text-slate-900">
-                        {event.platform?.toUpperCase()}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {event.element} · {event.trigger}
-                      </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {event.eventName || event.platform?.toUpperCase()}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {event.platform?.toUpperCase()} ·{' '}
+                          {event.trigger || 'script'}
+                        </p>
+                      </div>
+                      <span className="text-xs text-emerald-600">
+                        {event.status}
+                      </span>
                     </div>
-                    <span className="text-xs text-emerald-600">
-                      {event.status}
-                    </span>
+                    {event.element ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        来源：{event.element}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -149,6 +165,13 @@ function PageDetailRoute() {
               <p>SEO 问题数量：{page.issueCounts?.totals.seoIssues ?? 0}</p>
               <p>UTM 缺失链接：{page.links?.utmSummary?.missingUtm ?? 0}</p>
             </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 p-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              UTM 链接清单
+            </h2>
+            <UtmLinkTable summary={page.links?.utmSummary} />
           </section>
         </div>
       ) : pageQuery.isPending ? (
@@ -184,7 +207,84 @@ const Field = ({ label, value }: { label: string; value: unknown }) => (
   </div>
 );
 
-type UtmSummary = NonNullable<ScanPageWithMetrics['links']>['utmSummary'];
+type UtmSummary = NonNullable<
+  NonNullable<ScanPageWithMetrics['links']>['utmSummary']
+>;
+
+const deviceVariantLabels: Record<string, string> = {
+  desktop: '桌面',
+  tablet: '平板',
+  mobile: '移动',
+};
+
+const formatDeviceVariant = (variant?: string | null) => {
+  if (!variant) return '未识别';
+  return deviceVariantLabels[variant] ?? variant;
+};
+
+const UtmLinkTable = ({
+  summary,
+}: {
+  summary?: UtmSummary | null;
+}) => {
+  const examples = summary?.examples ?? [];
+  if (examples.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-slate-500">
+        未检测到携带 UTM 参数的内部链接。
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-200 text-sm">
+        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+          <tr>
+            <th className="px-3 py-2">链接</th>
+            <th className="px-3 py-2">所在标题</th>
+            <th className="px-3 py-2">设备</th>
+            <th className="px-3 py-2">UTM 参数</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 bg-white">
+          {examples.map((example) => (
+            <tr key={example.url}>
+              <td className="px-3 py-2 align-top text-slate-900">
+                <a
+                  href={example.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="break-words text-sky-600 hover:underline"
+                >
+                  {example.url}
+                </a>
+              </td>
+              <td className="px-3 py-2 text-slate-600">
+                {example.heading?.text
+                  ? `${example.heading.tag?.toUpperCase() ?? ''} ${
+                      example.heading.text
+                    }`.trim()
+                  : '未定位'}
+              </td>
+              <td className="px-3 py-2 text-slate-600">
+                {formatDeviceVariant(example.deviceVariant)}
+              </td>
+              <td className="px-3 py-2 text-slate-600">
+                {example.params.length > 0
+                  ? example.params.join(', ')
+                  : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-slate-500">
+        共记录 {examples.length} 条（按扫描顺序）。
+      </p>
+    </div>
+  );
+};
 
 const calculateCoverage = (utmSummary?: UtmSummary | null) => {
   if (!utmSummary) return undefined;

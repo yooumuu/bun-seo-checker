@@ -40,13 +40,23 @@ export type SeoAnalysis = {
     score: number;
 };
 
+type DeviceVariant = "desktop" | "tablet" | "mobile";
+
 export type LinkAnalysis = {
     internalLinks: number;
     externalLinks: number;
     utmSummary: {
         trackedLinks: number;
         missingUtm: number;
-        examples: Array<{ url: string; params: string[] }>;
+        examples: Array<{
+            url: string;
+            params: string[];
+            heading?: {
+                tag: string | null;
+                text: string | null;
+            } | null;
+            deviceVariant?: DeviceVariant | null;
+        }>;
     };
     brokenLinks: number;
     redirects: number;
@@ -58,6 +68,7 @@ export type TrackingEventAnalysis = {
     trigger: string;
     platform: string;
     status: string;
+    eventName?: string | null;
 };
 
 type SeoIssueMap = Record<string, boolean> & {
@@ -150,8 +161,55 @@ export const analyzeLinks = (
     html: string,
     baseUrl: string
 ): LinkAnalysis => {
+    const detectDeviceVariant = (snippet: string): DeviceVariant | null => {
+        const attrs = [
+            extractAttribute(snippet, "class"),
+            extractAttribute(snippet, "data-device"),
+            extractAttribute(snippet, "data-viewport"),
+            extractAttribute(snippet, "data-framer-name"),
+            extractAttribute(snippet, "data-framer-viewport"),
+            extractAttribute(snippet, "data-breakpoint"),
+        ]
+            .filter(Boolean)
+            .map((value) => value!.toLowerCase())
+            .join(" ");
+
+        if (!attrs) return null;
+
+        const contains = (keywords: string[]) =>
+            keywords.some((keyword) =>
+                attrs.split(/\s+/).some((token) => token.includes(keyword))
+            );
+
+        if (contains(["desktop", "laptop", "pc"])) return "desktop";
+        if (contains(["tablet", "ipad"])) return "tablet";
+        if (contains(["mobile", "phone", "iphone", "android"])) return "mobile";
+        return null;
+    };
+
     const base = new URL(baseUrl);
-    const examples: Array<{ url: string; params: string[] }> = [];
+    const examples: Array<{
+        url: string;
+        params: string[];
+        heading?: { tag: string | null; text: string | null } | null;
+        deviceVariant?: DeviceVariant | null;
+    }> = [];
+    type Heading = { tag: string; text: string; index: number };
+    const headingRegex =
+        /<(h[1-3])[^>]*>([\s\S]*?)<\/\1>/gi;
+    const headings: Heading[] = [];
+    let headingMatch: RegExpExecArray | null;
+    while ((headingMatch = headingRegex.exec(html))) {
+        const tag = headingMatch[1] ?? "h1";
+        const rawText = headingMatch[2] ?? "";
+        headings.push({
+            tag,
+            text: decodeHtmlEntities(rawText.replace(/<[^>]+>/g, "").trim()),
+            index: headingMatch.index ?? 0,
+        });
+    }
+    let headingPointer = 0;
+    let currentHeading: Heading | null = headings[0] ?? null;
     const discoveredInternal = new Set<string>();
     let internal = 0;
     let external = 0;
@@ -169,18 +227,31 @@ export const analyzeLinks = (
             const utmParams = Array.from(linkUrl.searchParams.keys()).filter(
                 (key) => key.toLowerCase().startsWith("utm_")
             );
+            const anchorIndex = match.index ?? 0;
+            while (
+                headingPointer < headings.length &&
+                headings[headingPointer]!.index <= anchorIndex
+            ) {
+                currentHeading = headings[headingPointer]!;
+                headingPointer += 1;
+            }
 
             if (isInternal) internal += 1;
             else external += 1;
 
             if (utmParams.length > 0) {
                 tracked += 1;
-                if (examples.length < 10) {
-                    examples.push({
-                        url: normalized,
-                        params: utmParams,
-                    });
-                }
+                examples.push({
+                    url: normalized,
+                    params: utmParams,
+                    heading: currentHeading
+                        ? {
+                              tag: currentHeading.tag,
+                              text: currentHeading.text || null,
+                          }
+                        : null,
+                    deviceVariant: detectDeviceVariant(match[0]),
+                });
             } else if (isInternal) {
                 missing += 1;
             }
@@ -210,23 +281,83 @@ export const analyzeLinks = (
 };
 
 export const analyzeTracking = (html: string): TrackingEventAnalysis[] => {
-    const events: TrackingEventAnalysis[] = [];
+    const extractMatches = (
+        source: string,
+        regex: RegExp,
+        map: (match: RegExpExecArray) => TrackingEventAnalysis
+    ) => {
+        const results: TrackingEventAnalysis[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(source))) {
+            results.push(map(match));
+        }
+        return results;
+    };
 
-    if (/mixpanel\.track/i.test(html) || /data-mixpanel/i.test(html)) {
+    const events: TrackingEventAnalysis[] = [];
+    const lower = html.toLowerCase();
+
+    const mixpanelEventRegex =
+        /(?:window(?:\?\.)?\.)?mixpanel(?:\?\.)?\.track\s*\(\s*(['"`])([^'"`]+)\1/gi;
+    events.push(
+        ...extractMatches(html, mixpanelEventRegex, (match) => ({
+            element: "script",
+            trigger: "track",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: match[2]?.trim() ?? null,
+        }))
+    );
+
+    if (events.length === 0 && /mixpanel/.test(lower)) {
         events.push({
             element: "script",
             trigger: "load",
             platform: "mixpanel",
             status: "detected",
+            eventName: null,
         });
     }
 
-    if (/gtag\(/i.test(html) || /ga\(['"]send/i.test(html)) {
+    const gtagEventRegex = new RegExp(
+        String.raw`gtag\s*\(\s*(["'])event\1\s*,\s*(["'])([^"']+)\2`,
+        "gi"
+    );
+    events.push(
+        ...extractMatches(html, gtagEventRegex, (match) => ({
+            element: "script",
+            trigger: "event",
+            platform: "ga",
+            status: "detected",
+            eventName: match[3]?.trim() ?? null,
+        }))
+    );
+
+    const dataLayerRegex = new RegExp(
+        String.raw`dataLayer(?:\?\.)?\.push\s*\(\s*\{[^}]*event\s*:\s*(["'])([^"']+)\1`,
+        "gi"
+    );
+    events.push(
+        ...extractMatches(html, dataLayerRegex, (match) => ({
+            element: "dataLayer",
+            trigger: "push",
+            platform: "ga",
+            status: "detected",
+            eventName: match[2]?.trim() ?? null,
+        }))
+    );
+
+    if (
+        !events.some((event) => event.platform === "ga") &&
+        (/\bgtag\(/i.test(html) ||
+            new RegExp(String.raw`\bga\((["'])send`, "i").test(html))
+    ) {
         events.push({
             element: "script",
             trigger: "load",
             platform: "ga",
             status: "detected",
+            eventName: null,
         });
     }
 

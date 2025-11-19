@@ -1,0 +1,1 @@
+ALTER TABLE "tracking_events" ADD COLUMN "event_name" text;

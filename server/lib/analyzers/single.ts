@@ -135,6 +135,7 @@ export const scanSinglePage = async (
                         pageId: page.id,
                         element: event.element,
                         trigger: event.trigger,
+                        eventName: event.eventName ?? null,
                         platform: event.platform,
                         status: event.status,
                     }))

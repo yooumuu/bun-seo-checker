@@ -287,7 +287,8 @@ function ScanDetailRoute() {
                     calculateCoverage(pageItem.links?.utmSummary)
                   )}
                 </p>
-                <p>Tracking {pageItem.trackingEvents.length} 个</p>
+                <UtmInlineList summary={pageItem.links?.utmSummary} />
+                <p className="mt-1">Tracking {pageItem.trackingEvents.length} 个</p>
               </div>
               <div className="flex items-center justify-end">
                 <Link
@@ -356,11 +357,63 @@ const SummaryCard = ({
   </div>
 );
 
-type PageUtmSummary = NonNullable<ScanPageWithMetrics['links']>['utmSummary'];
+type PageUtmSummary = NonNullable<
+  NonNullable<ScanPageWithMetrics['links']>['utmSummary']
+>;
 
 const calculateCoverage = (utmSummary?: PageUtmSummary | null) => {
   if (!utmSummary) return undefined;
   const total = (utmSummary.trackedLinks ?? 0) + (utmSummary.missingUtm ?? 0);
   if (total === 0) return undefined;
   return Math.round(((utmSummary.trackedLinks ?? 0) / total) * 100);
+};
+
+
+const UtmInlineList = ({
+  summary,
+}: {
+  summary?: PageUtmSummary | null;
+}) => {
+  const examples = summary?.examples ?? [];
+  if (examples.length === 0) {
+    return <p className="text-[11px] text-slate-500">暂无 UTM 链接</p>;
+  }
+
+  const formatHeading = (example: PageUtmSummary['examples'][number]) => {
+    if (!example.heading?.text) return '未定位';
+    const level = example.heading?.tag?.toUpperCase();
+    return `${level ?? ''} ${example.heading.text}`.trim();
+  };
+
+  return (
+    <ul className="mt-1 space-y-1 text-[11px] text-slate-500">
+      {examples.slice(0, 3).map((example) => (
+        <li key={example.url} className="break-words">
+          {example.deviceVariant ? (
+            <span className="mr-1 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+              {formatDeviceVariant(example.deviceVariant)}
+            </span>
+          ) : null}
+          <span className="font-medium text-slate-600">
+            {formatHeading(example)}
+          </span>{' '}
+          · {example.url}
+        </li>
+      ))}
+      {examples.length > 3 ? (
+        <li>... 等 {examples.length} 条</li>
+      ) : null}
+    </ul>
+  );
+};
+
+const deviceVariantLabels: Record<string, string> = {
+  desktop: '桌面',
+  tablet: '平板',
+  mobile: '移动',
+};
+
+const formatDeviceVariant = (variant?: string | null) => {
+  if (!variant) return '未识别';
+  return deviceVariantLabels[variant] ?? variant;
 };

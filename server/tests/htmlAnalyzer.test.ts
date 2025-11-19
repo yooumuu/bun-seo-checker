@@ -24,9 +24,19 @@ const sampleHtml = `
   </head>
   <body>
     <h1>Heading</h1>
-    <a href="/internal?utm_source=newsletter&utm_campaign=test">Internal tracked</a>
-    <a href="/internal-two">Internal missing</a>
+    <a class="cta desktop-link" data-viewport="desktop" href="/internal?utm_source=newsletter&utm_campaign=test">Internal tracked</a>
+    <a class="cta mobile-only" data-viewport="mobile" href="/internal-two">Internal missing</a>
     <a href="https://external.com/page">External</a>
+  </body>
+</html>
+`;
+
+const responsiveHtml = `
+<!doctype html>
+<html>
+  <body>
+    <a class="desktop-cta" data-viewport="desktop" href="/cta?utm_source=desktop">Desktop CTA</a>
+    <a class="mobile-cta" data-device="mobile" href="/cta?utm_source=mobile">Mobile CTA</a>
   </body>
 </html>
 `;
@@ -56,13 +66,46 @@ describe("HTML analyzer helpers", () => {
         expect(links.externalLinks).toBe(1);
         expect(links.utmSummary.trackedLinks).toBe(1);
         expect(links.utmSummary.missingUtm).toBe(1);
+        expect(links.utmSummary.examples[0]?.heading?.text).toBe("Heading");
+        expect(links.utmSummary.examples[0]?.heading?.tag).toBe("h1");
+        expect(links.utmSummary.examples[0]?.deviceVariant).toBe("desktop");
     });
 
-    it("detects tracking snippets", () => {
-        const tracking = analyzeTracking(sampleHtml);
-        expect(tracking.length).toBe(2);
-        expect(tracking[0]?.platform).toBe("mixpanel");
-        expect(tracking[1]?.platform).toBe("ga");
+    it("detects device variants for UTM links", () => {
+        const links = analyzeLinks(responsiveHtml, "https://example.com");
+        const desktop = links.utmSummary.examples.find((example) =>
+            example.url.includes("desktop")
+        );
+        const mobile = links.utmSummary.examples.find((example) =>
+            example.url.includes("mobile")
+        );
+        expect(desktop?.deviceVariant).toBe("desktop");
+        expect(mobile?.deviceVariant).toBe("mobile");
+    });
+
+    it("detects tracking snippets and events", () => {
+        const script = `
+        <script>
+            window?.mixpanel?.track("newsletter_subscription");
+            gtag('event', 'cta_click');
+            dataLayer.push({ event: 'form_submit' });
+        </script>`;
+        const tracking = analyzeTracking(script);
+        expect(tracking.some((event) => event.platform === "mixpanel")).toBe(
+            true
+        );
+        const mixpanelEvent = tracking.find(
+            (event) => event.platform === "mixpanel"
+        );
+        expect(mixpanelEvent?.eventName).toBe("newsletter_subscription");
+        const gaEvents = tracking.filter((event) => event.platform === "ga");
+        expect(gaEvents.length).toBeGreaterThanOrEqual(2);
+        expect(
+            gaEvents.some((event) => event.eventName === "cta_click")
+        ).toBe(true);
+        expect(
+            gaEvents.some((event) => event.eventName === "form_submit")
+        ).toBe(true);
     });
 
     it("summarizes issues for missing metadata", () => {
