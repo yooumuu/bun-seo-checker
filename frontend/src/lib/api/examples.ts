@@ -12,7 +12,7 @@ export const getAllExamples = () =>
 
 // 获取所有例子的 query options
 export const getAllExamplesQueryOptions = queryOptions({
-  queryKey: ['get-examples-list'],
+  queryKey: ['get-examples-list'] as const,
   queryFn: getAllExamples,
   staleTime: 1000 * 60 * 5, // 5分钟
 });
@@ -24,7 +24,7 @@ export const getExampleById = ({ id }: { id: string }) =>
 // 获取单个例子的 query options
 export const getExampleByIdQueryOptions = (id: string) =>
   queryOptions({
-    queryKey: ['example', id],
+    queryKey: ['example', id] as const,
     queryFn: () => getExampleById({ id }),
     staleTime: 1000 * 60 * 5, // 5分钟
   });

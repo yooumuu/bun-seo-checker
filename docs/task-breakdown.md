@@ -4,17 +4,17 @@
 
 ## 阶段 0：项目准备
 
-- [ ] **0.1** 梳理 `.env`，加入 `SCAN_WORKERS_MAX_CONCURRENCY`、`SCANNER_MAX_PAGES`、`SCANNER_DEFAULT_SITE_DEPTH`、`SCANNER_USER_AGENT` 等变量并更新 README（产出：新版 `.env.example`；备注：与 `DATABASE_URL` 一并管理）
-- [ ] **0.2** 配置 Drizzle schema 框架，新增 `scan_jobs` 等表、关系与 zod schema（产出：`server/lib/db/schema/*`；备注：生成第一版迁移）
-- [ ] **0.3** 更新共享类型输出（`server/shared/types.ts`）并调整 frontend `tsconfig` alias（产出：同步后的类型文件；备注：确保 API 客户端可访问新类型）
+- [x] **0.1** 梳理 `.env`，加入 `SCAN_WORKERS_MAX_CONCURRENCY`、`SCANNER_MAX_PAGES`、`SCANNER_DEFAULT_SITE_DEPTH`、`SCANNER_USER_AGENT` 等变量并更新 README（产出：新版 `.env.example`；备注：与 `DATABASE_URL` 一并管理）
+- [x] **0.2** 配置 Drizzle schema 框架，新增 `scan_jobs` 等表、关系与 zod schema（产出：`server/lib/db/schema/*`；备注：生成第一版迁移）
+- [x] **0.3** 更新共享类型输出（`server/shared/types.ts`）并调整 frontend `tsconfig` alias（产出：同步后的类型文件；备注：确保 API 客户端可访问新类型）
 
 ## 阶段 1：后端任务引擎
 
-- [ ] **1.1** 搭建扫描任务 CRUD API（`POST /api/scans`, `GET /api/scans`, `GET /api/scans/:id`）（产出：Hono 路由 + zod 校验；验收：可创建任务并查询记录）
-- [ ] **1.2** 实现任务队列与调度器（内存队列 + worker 池 + 并发限制）（产出：`server/lib/workers/*`；验收：同时运行任务 ≤ 配置并发）
-- [ ] **1.3** 开发单页分析器（fetch HTML → 解析 SEO/链接/埋点结果）（产出：`server/lib/analyzers/*`；验收：至少 3 个示例页面返回结构化指标）
-- [ ] **1.4** 扩展整站模式（抓取 sitemap/内部链接、尊重用户填写的整站深度设置，默认 sitemap 首层、深度限制、页面排重）（产出：crawler 模块；验收：可扫描多页并写入数据库）
-- [ ] **1.5** 记录实时进度并暴露 `/api/scans/progress/live` SSE（产出：`task_events` 表或内存 channel + SSE 路由；验收：前端能订阅任务状态）
+- [x] **1.1** 搭建扫描任务 CRUD API（`POST /api/scans`, `GET /api/scans`, `GET /api/scans/:id`）（产出：Hono 路由 + zod 校验；验收：可创建任务并查询记录）
+- [x] **1.2** 实现任务队列与调度器（内存队列 + worker 池 + 并发限制）（产出：`server/lib/workers/*`；验收：同时运行任务 ≤ 配置并发）
+- [x] **1.3** 开发单页分析器（fetch HTML → 解析 SEO/链接/埋点结果）（产出：`server/lib/analyzers/*`；验收：至少 3 个示例页面返回结构化指标）
+- [x] **1.4** 扩展整站模式（抓取 sitemap/内部链接、尊重用户填写的整站深度设置，默认 sitemap 首层、深度限制、页面排重）（产出：crawler 模块；验收：可扫描多页并写入数据库）
+- [x] **1.5** 记录实时进度并暴露 `/api/scans/progress/live` SSE（产出：`task_events` 表或内存 channel + SSE 路由；验收：前端能订阅任务状态）
 
 ## 阶段 2：数据输出与指标 API
 

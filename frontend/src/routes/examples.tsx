@@ -127,7 +127,7 @@ function RouteComponent() {
     return <div>加载出错: {error?.message}</div>;
   }
 
-  const examples = examplesData?.examples || [];
+  const examples: Example[] = (examplesData as { examples: Example[] } | undefined)?.examples || [];
 
   return (
     <div>

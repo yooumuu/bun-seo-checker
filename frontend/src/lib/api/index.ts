@@ -3,6 +3,10 @@ import { type ApiRoutes } from '@shared/types';
 
 const client = hc<ApiRoutes>('/');
 
+if (!client.api) {
+  throw new Error('API routes are not available on client');
+}
+
 export const api = client.api;
 
 // 通用的响应处理函数

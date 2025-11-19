@@ -14,3 +14,40 @@ export type UpdateExample = z.infer<typeof schema.updateExampleSchema>;
 import type { ApiRoutes } from '../app';
 
 export type { ApiRoutes };
+
+// Scan Jobs
+export const SelectScanJobSchema = schema.selectScanJobSchema;
+export const InsertScanJobSchema = schema.insertScanJobSchema;
+export type ScanJob = z.infer<typeof schema.selectScanJobSchema>;
+export type NewScanJob = z.infer<typeof schema.insertScanJobSchema>;
+
+// Scan Pages
+export const SelectScanPageSchema = schema.selectScanPageSchema;
+export const InsertScanPageSchema = schema.insertScanPageSchema;
+export type ScanPage = z.infer<typeof schema.selectScanPageSchema>;
+export type NewScanPage = z.infer<typeof schema.insertScanPageSchema>;
+
+// SEO Metrics
+export const SelectSeoMetricsSchema = schema.selectSeoMetricsSchema;
+export const InsertSeoMetricsSchema = schema.insertSeoMetricsSchema;
+export type SeoMetrics = z.infer<typeof schema.selectSeoMetricsSchema>;
+export type NewSeoMetrics = z.infer<typeof schema.insertSeoMetricsSchema>;
+
+// Link Metrics
+export const SelectLinkMetricsSchema = schema.selectLinkMetricsSchema;
+export const InsertLinkMetricsSchema = schema.insertLinkMetricsSchema;
+export type LinkMetrics = z.infer<typeof schema.selectLinkMetricsSchema>;
+export type NewLinkMetrics = z.infer<typeof schema.insertLinkMetricsSchema>;
+
+// Tracking Events
+export const SelectTrackingEventSchema = schema.selectTrackingEventSchema;
+export const InsertTrackingEventSchema = schema.insertTrackingEventSchema;
+export type TrackingEvent = z.infer<typeof schema.selectTrackingEventSchema>;
+export type NewTrackingEvent = z.infer<typeof schema.insertTrackingEventSchema>;
+
+// Task Events
+export const SelectTaskEventSchema = schema.selectTaskEventSchema;
+export const InsertTaskEventSchema = schema.insertTaskEventSchema;
+export type TaskEvent = z.infer<typeof schema.selectTaskEventSchema>;
+export type NewTaskEvent = z.infer<typeof schema.insertTaskEventSchema>;
+
