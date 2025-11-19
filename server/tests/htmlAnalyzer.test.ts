@@ -76,6 +76,7 @@ describe("HTML analyzer helpers", () => {
         expect(summary.links.utmMissing).toBe(0);
         expect(summary.tracking.mixpanelMissing).toBe(true);
         expect(summary.totals.seoIssues).toBeGreaterThan(0);
+        expect(summary.meta.seoScore).toBeGreaterThanOrEqual(0);
     });
 
     it("aggregates summaries across pages", () => {
@@ -93,5 +94,11 @@ describe("HTML analyzer helpers", () => {
         expect(aggregated.seo.missingTitle).toBe(1);
         expect(aggregated.links.internalLinks).toBeGreaterThan(0);
         expect(aggregated.tracking.mixpanelMissing).toBe(1);
+        expect(aggregated.scorecard.seoAverageScore).toBeGreaterThan(0);
+        expect(aggregated.scorecard.utmCoveragePercent).toBeGreaterThanOrEqual(0);
+        expect(aggregated.scorecard.trackingCoverage.mixpanel).toBeGreaterThanOrEqual(
+            0
+        );
+        expect(aggregated.pagesAnalysed).toBe(2);
     });
 });

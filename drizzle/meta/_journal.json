@@ -8,6 +8,13 @@
       "when": 1763541555065,
       "tag": "0000_complex_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763545457699,
+      "tag": "0001_red_sprite",
+      "breakpoints": true
     }
   ]
 }

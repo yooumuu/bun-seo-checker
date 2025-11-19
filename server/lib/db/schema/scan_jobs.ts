@@ -1,7 +1,13 @@
 import { pgTable, serial, text, timestamp, integer, jsonb, boolean, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+
+export type ScanJobOptions = {
+    siteDepth?: number;
+    maxPages?: number;
+    userAgent?: string;
+    requestTimeoutMs?: number;
+};
 
 export const scanJobs = pgTable("scan_jobs", {
     id: serial("id").primaryKey(),
@@ -11,6 +17,7 @@ export const scanJobs = pgTable("scan_jobs", {
     pagesTotal: integer("pages_total").default(0),
     pagesFinished: integer("pages_finished").default(0),
     issuesSummary: jsonb("issues_summary"),
+    options: jsonb("options").$type<ScanJobOptions | null>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),

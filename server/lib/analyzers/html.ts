@@ -80,6 +80,10 @@ type TrackingIssueMap = Record<string, boolean> & {
     gaMissing: boolean;
 };
 
+type IssueSummaryMeta = {
+    seoScore: number;
+};
+
 export type IssueSummary = {
     seo: SeoIssueMap;
     links: LinkIssueMap;
@@ -89,6 +93,7 @@ export type IssueSummary = {
         linkIssues: number;
         trackingIssues: number;
     };
+    meta: IssueSummaryMeta;
 };
 
 export const analyzeSeo = (html: string): SeoAnalysis => {
@@ -270,10 +275,37 @@ export const buildIssueSummary = (
         links: linkMap,
         tracking: trackingMap,
         totals,
+        meta: {
+            seoScore: seo.score,
+        },
     };
 };
 
-export const aggregateSummaries = (summaries: IssueSummary[]) => {
+export type AggregatedIssueSummary = {
+    seo: Record<string, number>;
+    links: LinkIssueMap;
+    tracking: Record<string, number>;
+    totals: {
+        seoIssues: number;
+        linkIssues: number;
+        trackingIssues: number;
+    };
+    pagesAnalysed: number;
+    scorecard: {
+        seoAverageScore: number;
+        utmCoveragePercent: number;
+        trackingCoverage: {
+            mixpanel: number;
+            ga: number;
+            average: number;
+        };
+        overallHealthPercent: number;
+    };
+};
+
+export const aggregateSummaries = (
+    summaries: IssueSummary[]
+): AggregatedIssueSummary => {
     const aggregatedSeo: Record<string, number> = {};
     const aggregatedLinks: LinkIssueMap = {
         internalLinks: 0,
@@ -283,6 +315,7 @@ export const aggregateSummaries = (summaries: IssueSummary[]) => {
     };
     const aggregatedTracking: Record<string, number> = {};
     const totals = { seoIssues: 0, linkIssues: 0, trackingIssues: 0 };
+    let seoScoreTotal = 0;
 
     if (summaries.length === 0) {
         return {
@@ -290,6 +323,17 @@ export const aggregateSummaries = (summaries: IssueSummary[]) => {
             links: aggregatedLinks,
             tracking: aggregatedTracking,
             totals,
+            pagesAnalysed: 0,
+            scorecard: {
+                seoAverageScore: 0,
+                utmCoveragePercent: 0,
+                trackingCoverage: {
+                    mixpanel: 0,
+                    ga: 0,
+                    average: 0,
+                },
+                overallHealthPercent: 0,
+            },
         };
     }
 
@@ -297,6 +341,7 @@ export const aggregateSummaries = (summaries: IssueSummary[]) => {
         totals.seoIssues += summary.totals.seoIssues;
         totals.linkIssues += summary.totals.linkIssues;
         totals.trackingIssues += summary.totals.trackingIssues;
+        seoScoreTotal += summary.meta.seoScore ?? 0;
 
         for (const [key, value] of Object.entries(summary.seo)) {
             aggregatedSeo[key] = (aggregatedSeo[key] ?? 0) + (value ? 1 : 0);
@@ -313,10 +358,49 @@ export const aggregateSummaries = (summaries: IssueSummary[]) => {
         }
     }
 
+    const pagesAnalysed = summaries.length;
+    const seoAverageScore = pagesAnalysed
+        ? Math.round(seoScoreTotal / pagesAnalysed)
+        : 0;
+    const totalTrackedLinks = aggregatedLinks.utmTracked ?? 0;
+    const totalMissingLinks = aggregatedLinks.utmMissing ?? 0;
+    const linkDenominator = totalTrackedLinks + totalMissingLinks;
+    const utmCoveragePercent =
+        linkDenominator > 0
+            ? Math.round((totalTrackedLinks / linkDenominator) * 100)
+            : 0;
+
+    const mixpanelMissing = aggregatedTracking.mixpanelMissing ?? 0;
+    const gaMissing = aggregatedTracking.gaMissing ?? 0;
+    const mixpanelCoverage = pagesAnalysed
+        ? Math.round(((pagesAnalysed - mixpanelMissing) / pagesAnalysed) * 100)
+        : 0;
+    const gaCoverage = pagesAnalysed
+        ? Math.round(((pagesAnalysed - gaMissing) / pagesAnalysed) * 100)
+        : 0;
+    const trackingCoverageAverage = Math.round(
+        (mixpanelCoverage + gaCoverage) / 2
+    );
+
+    const overallHealthPercent = Math.round(
+        (seoAverageScore + utmCoveragePercent + trackingCoverageAverage) / 3
+    );
+
     return {
         seo: aggregatedSeo,
         links: aggregatedLinks,
         tracking: aggregatedTracking,
         totals,
+        pagesAnalysed,
+        scorecard: {
+            seoAverageScore,
+            utmCoveragePercent,
+            trackingCoverage: {
+                mixpanel: mixpanelCoverage,
+                ga: gaCoverage,
+                average: trackingCoverageAverage,
+            },
+            overallHealthPercent,
+        },
     };
 };

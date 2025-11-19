@@ -70,10 +70,7 @@ export async function runScanJob(jobId: number) {
                 completedAt: new Date(),
                 pagesTotal,
                 pagesFinished,
-                issuesSummary: {
-                    pagesAnalysed: pagesFinished,
-                    ...summaryPayload,
-                },
+                issuesSummary: summaryPayload,
             })
             .where(eq(scanJobs.id, jobId));
 

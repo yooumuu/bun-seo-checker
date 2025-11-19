@@ -11,20 +11,34 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
-import { Route as ExamplesImport } from './routes/examples'
 import { Route as IndexImport } from './routes/index'
+import { Route as HistoryIndexImport } from './routes/history/index'
+import { Route as HistoryScanIdIndexImport } from './routes/history/$scanId/index'
+import { Route as HistoryScanIdPagesPageIdImport } from './routes/history/$scanId/pages/$pageId'
 
 // Create/Update Routes
-
-const ExamplesRoute = ExamplesImport.update({
-  id: '/examples',
-  path: '/examples',
-  getParentRoute: () => rootRoute,
-} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const HistoryIndexRoute = HistoryIndexImport.update({
+  id: '/history/',
+  path: '/history/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const HistoryScanIdIndexRoute = HistoryScanIdIndexImport.update({
+  id: '/history/$scanId/',
+  path: '/history/$scanId/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const HistoryScanIdPagesPageIdRoute = HistoryScanIdPagesPageIdImport.update({
+  id: '/history/$scanId/pages/$pageId',
+  path: '/history/$scanId/pages/$pageId',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -39,11 +53,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
-    '/examples': {
-      id: '/examples'
-      path: '/examples'
-      fullPath: '/examples'
-      preLoaderRoute: typeof ExamplesImport
+    '/history/': {
+      id: '/history/'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/history/$scanId/': {
+      id: '/history/$scanId/'
+      path: '/history/$scanId'
+      fullPath: '/history/$scanId'
+      preLoaderRoute: typeof HistoryScanIdIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/history/$scanId/pages/$pageId': {
+      id: '/history/$scanId/pages/$pageId'
+      path: '/history/$scanId/pages/$pageId'
+      fullPath: '/history/$scanId/pages/$pageId'
+      preLoaderRoute: typeof HistoryScanIdPagesPageIdImport
       parentRoute: typeof rootRoute
     }
   }
@@ -53,37 +81,56 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/examples': typeof ExamplesRoute
+  '/history': typeof HistoryIndexRoute
+  '/history/$scanId': typeof HistoryScanIdIndexRoute
+  '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/examples': typeof ExamplesRoute
+  '/history': typeof HistoryIndexRoute
+  '/history/$scanId': typeof HistoryScanIdIndexRoute
+  '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
-  '/examples': typeof ExamplesRoute
+  '/history/': typeof HistoryIndexRoute
+  '/history/$scanId/': typeof HistoryScanIdIndexRoute
+  '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/examples'
+  fullPaths:
+    | '/'
+    | '/history'
+    | '/history/$scanId'
+    | '/history/$scanId/pages/$pageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/examples'
-  id: '__root__' | '/' | '/examples'
+  to: '/' | '/history' | '/history/$scanId' | '/history/$scanId/pages/$pageId'
+  id:
+    | '__root__'
+    | '/'
+    | '/history/'
+    | '/history/$scanId/'
+    | '/history/$scanId/pages/$pageId'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ExamplesRoute: typeof ExamplesRoute
+  HistoryIndexRoute: typeof HistoryIndexRoute
+  HistoryScanIdIndexRoute: typeof HistoryScanIdIndexRoute
+  HistoryScanIdPagesPageIdRoute: typeof HistoryScanIdPagesPageIdRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ExamplesRoute: ExamplesRoute,
+  HistoryIndexRoute: HistoryIndexRoute,
+  HistoryScanIdIndexRoute: HistoryScanIdIndexRoute,
+  HistoryScanIdPagesPageIdRoute: HistoryScanIdPagesPageIdRoute,
 }
 
 export const routeTree = rootRoute
@@ -97,14 +144,22 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/examples"
+        "/history/",
+        "/history/$scanId/",
+        "/history/$scanId/pages/$pageId"
       ]
     },
     "/": {
       "filePath": "index.tsx"
     },
-    "/examples": {
-      "filePath": "examples.tsx"
+    "/history/": {
+      "filePath": "history/index.tsx"
+    },
+    "/history/$scanId/": {
+      "filePath": "history/$scanId/index.tsx"
+    },
+    "/history/$scanId/pages/$pageId": {
+      "filePath": "history/$scanId/pages/$pageId.tsx"
     }
   }
 }

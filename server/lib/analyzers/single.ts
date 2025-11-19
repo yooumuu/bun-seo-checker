@@ -24,18 +24,26 @@ type FetchResult = {
     loadTimeMs: number;
 };
 
-const fetchPage = async (url: string): Promise<FetchResult> => {
+type FetchOverrides = {
+    userAgent?: string | null;
+    timeoutMs?: number | null;
+};
+
+const fetchPage = async (
+    url: string,
+    overrides?: FetchOverrides
+): Promise<FetchResult> => {
     const controller = new AbortController();
     const timeout = setTimeout(
         () => controller.abort(),
-        env.SCANNER_REQUEST_TIMEOUT_MS
+        overrides?.timeoutMs ?? env.SCANNER_REQUEST_TIMEOUT_MS
     );
 
     const started = Date.now();
     try {
         const response = await fetch(url, {
             headers: {
-                "User-Agent": env.SCANNER_USER_AGENT,
+                "User-Agent": overrides?.userAgent ?? env.SCANNER_USER_AGENT,
             },
             redirect: "follow",
             signal: controller.signal,
@@ -82,7 +90,10 @@ export const scanSinglePage = async (
         }
 
         try {
-            const fetchResult = await fetchPage(pageUrl);
+            const fetchResult = await fetchPage(pageUrl, {
+                userAgent: job.options?.userAgent,
+                timeoutMs: job.options?.requestTimeoutMs,
+            });
             const seo = analyzeSeo(fetchResult.html);
             const links = analyzeLinks(fetchResult.html, pageUrl);
             const tracking = analyzeTracking(fetchResult.html);

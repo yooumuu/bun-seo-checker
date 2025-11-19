@@ -5,6 +5,11 @@ import type { scanJobs } from "../db/schema/scan_jobs";
 
 type ScanJobRecord = typeof scanJobs.$inferSelect;
 
+type SiteScanOverrides = {
+    userAgent?: string | null;
+    timeoutMs?: number | null;
+};
+
 const normalizeUrl = (url: string) => {
     try {
         const parsed = new URL(url);
@@ -16,19 +21,25 @@ const normalizeUrl = (url: string) => {
     }
 };
 
-const fetchSitemapUrls = async (baseUrl: string, max: number) => {
+const fetchSitemapUrls = async (
+    baseUrl: string,
+    max: number,
+    overrides: SiteScanOverrides
+) => {
     try {
         const origin = new URL(baseUrl).origin;
         const sitemapUrl = `${origin}/sitemap.xml`;
         const controller = new AbortController();
         const timeout = setTimeout(
             () => controller.abort(),
-            env.SCANNER_REQUEST_TIMEOUT_MS
+            overrides.timeoutMs ?? env.SCANNER_REQUEST_TIMEOUT_MS
         );
 
         try {
             const response = await fetch(sitemapUrl, {
-                headers: { "User-Agent": env.SCANNER_USER_AGENT },
+                headers: {
+                    "User-Agent": overrides.userAgent ?? env.SCANNER_USER_AGENT,
+                },
                 signal: controller.signal,
             });
             if (!response.ok) {
@@ -62,9 +73,18 @@ export const scanSite = async (
     job: ScanJobRecord,
     onPage?: (result: SingleScanResult) => void | Promise<void>
 ) => {
-    const depthLimit = env.SCANNER_DEFAULT_SITE_DEPTH;
-    const maxPages = env.SCANNER_MAX_PAGES;
-    const sitemapUrls = await fetchSitemapUrls(job.targetUrl, maxPages);
+    const depthLimit =
+        job.options?.siteDepth ?? env.SCANNER_DEFAULT_SITE_DEPTH;
+    const maxPages = job.options?.maxPages ?? env.SCANNER_MAX_PAGES;
+    const overrides: SiteScanOverrides = {
+        userAgent: job.options?.userAgent,
+        timeoutMs: job.options?.requestTimeoutMs,
+    };
+    const sitemapUrls = await fetchSitemapUrls(
+        job.targetUrl,
+        maxPages,
+        overrides
+    );
     const queue: QueueItem[] = [{ url: job.targetUrl, depth: 0 }];
     sitemapUrls.forEach((url) => {
         queue.push({ url, depth: 1 });

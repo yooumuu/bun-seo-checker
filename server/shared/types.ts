@@ -1,5 +1,12 @@
 import type { z } from 'zod';
 import * as schema from '../lib/db/schema';
+import type {
+  AggregatedIssueSummary,
+  IssueSummary as AnalyzerIssueSummary,
+} from '../lib/analyzers/html';
+import type { PageWithMetrics } from '../lib/services/scanPages';
+import type { TaskEventMessage } from '../lib/workers/events';
+import type { ScanJobOptions as ScanJobOptionsSchema } from '../lib/db/schema/scan_jobs';
 
 // 导出schema，方便在应用其他地方使用
 export const SelectExampleSchema = schema.selectExampleSchema;
@@ -20,12 +27,16 @@ export const SelectScanJobSchema = schema.selectScanJobSchema;
 export const InsertScanJobSchema = schema.insertScanJobSchema;
 export type ScanJob = z.infer<typeof schema.selectScanJobSchema>;
 export type NewScanJob = z.infer<typeof schema.insertScanJobSchema>;
+export type ScanIssuesSummary = AggregatedIssueSummary;
+export type ScanJobOptions = ScanJobOptionsSchema;
 
 // Scan Pages
 export const SelectScanPageSchema = schema.selectScanPageSchema;
 export const InsertScanPageSchema = schema.insertScanPageSchema;
 export type ScanPage = z.infer<typeof schema.selectScanPageSchema>;
 export type NewScanPage = z.infer<typeof schema.insertScanPageSchema>;
+export type ScanPageWithMetrics = PageWithMetrics;
+export type PageIssueSummary = AnalyzerIssueSummary;
 
 // SEO Metrics
 export const SelectSeoMetricsSchema = schema.selectSeoMetricsSchema;
@@ -50,4 +61,4 @@ export const SelectTaskEventSchema = schema.selectTaskEventSchema;
 export const InsertTaskEventSchema = schema.insertTaskEventSchema;
 export type TaskEvent = z.infer<typeof schema.selectTaskEventSchema>;
 export type NewTaskEvent = z.infer<typeof schema.insertTaskEventSchema>;
-
+export type LiveTaskEvent = TaskEventMessage;

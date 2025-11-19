@@ -1,16 +1,42 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../lib/db";
-import { scanJobs } from "../lib/db/schema";
+import {
+    linkMetrics,
+    scanJobs,
+    scanPages,
+    seoMetrics,
+    taskEvents,
+    trackingEvents,
+} from "../lib/db/schema";
 import { scanScheduler } from "../lib/workers";
 import { getRecentTaskEvents, subscribeToTaskEvents } from "../lib/workers/events";
 import { streamSSE } from "hono/streaming";
+import {
+    getPageForJob,
+    listPagesForJob,
+} from "../lib/services/scanPages";
+
+const jobOptionsSchema = z
+    .object({
+        siteDepth: z.coerce.number().int().min(1).max(10).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
+        userAgent: z.string().min(1).max(256).optional(),
+        requestTimeoutMs: z
+            .coerce.number()
+            .int()
+            .min(1000)
+            .max(120000)
+            .optional(),
+    })
+    .partial();
 
 const createScanJobSchema = z.object({
     targetUrl: z.string().url(),
     mode: z.enum(["single", "site"]),
+    options: jobOptionsSchema.optional(),
 });
 
 const listScansSchema = z.object({
@@ -29,6 +55,24 @@ const paramIdSchema = z.object({
     id: z.coerce.number().int().positive(),
 });
 
+const pageStatusEnum = ["pending", "processing", "completed", "failed"] as const;
+
+const listPagesQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    search: z.string().min(1).max(512).optional(),
+    status: z.enum(pageStatusEnum).optional(),
+    sort: z
+        .enum(["createdAt", "url", "httpStatus", "loadTimeMs", "seoScore"])
+        .default("createdAt"),
+    direction: z.enum(["asc", "desc"]).default("desc"),
+});
+
+const pageParamSchema = z.object({
+    id: z.coerce.number().int().positive(),
+    pageId: z.coerce.number().int().positive(),
+});
+
 const sortColumns = {
     createdAt: scanJobs.createdAt,
     startedAt: scanJobs.startedAt,
@@ -43,12 +87,17 @@ const app = new Hono()
         zValidator("json", createScanJobSchema),
         async (c) => {
             const data = c.req.valid("json");
+            const normalizedOptions =
+                data.options && Object.keys(data.options).length > 0
+                    ? data.options
+                    : null;
             const [job] = await db
                 .insert(scanJobs)
                 .values({
                     targetUrl: data.targetUrl,
                     mode: data.mode,
                     status: "pending",
+                    options: normalizedOptions,
                 })
                 .returning();
 
@@ -150,6 +199,108 @@ const app = new Hono()
             }
 
             return c.json(job);
+        }
+    )
+    .get(
+        "/:id/pages",
+        zValidator("param", paramIdSchema),
+        zValidator("query", listPagesQuerySchema),
+        async (c) => {
+            const { id } = c.req.valid("param");
+            const query = c.req.valid("query");
+
+            const jobExists = await db
+                .select({ id: scanJobs.id })
+                .from(scanJobs)
+                .where(eq(scanJobs.id, id))
+                .limit(1)
+                .then((rows) => rows[0]);
+            if (!jobExists) {
+                c.status(404);
+                return c.json({ error: "Job not found" });
+            }
+
+            const result = await listPagesForJob(id, query);
+            return c.json(result);
+        }
+    )
+    .get(
+        "/:id/pages/:pageId",
+        zValidator("param", pageParamSchema),
+        async (c) => {
+            const { id, pageId } = c.req.valid("param");
+
+            const jobExists = await db
+                .select({ id: scanJobs.id })
+                .from(scanJobs)
+                .where(eq(scanJobs.id, id))
+                .limit(1)
+                .then((rows) => rows[0]);
+            if (!jobExists) {
+                c.status(404);
+                return c.json({ error: "Job not found" });
+            }
+
+            const page = await getPageForJob(id, pageId);
+            if (!page) {
+                c.status(404);
+                return c.json({ error: "Page not found" });
+            }
+
+            return c.json(page);
+        }
+    )
+    .delete(
+        "/:id",
+        zValidator("param", paramIdSchema),
+        async (c) => {
+            const { id } = c.req.valid("param");
+
+            const job = await db
+                .select()
+                .from(scanJobs)
+                .where(eq(scanJobs.id, id))
+                .limit(1)
+                .then((rows) => rows[0]);
+
+            if (!job) {
+                c.status(404);
+                return c.json({ error: "Job not found" });
+            }
+
+            if (job.status === "running" || job.status === "pending") {
+                c.status(409);
+                return c.json({
+                    error: "Job is still running. Stop the scan before deleting.",
+                });
+            }
+
+            await db.transaction(async (tx) => {
+                const pageIds = await tx
+                    .select({ id: scanPages.id })
+                    .from(scanPages)
+                    .where(eq(scanPages.jobId, id));
+                const ids = pageIds.map((row) => row.id);
+
+                if (ids.length > 0) {
+                    await tx
+                        .delete(trackingEvents)
+                        .where(inArray(trackingEvents.pageId, ids));
+                    await tx
+                        .delete(seoMetrics)
+                        .where(inArray(seoMetrics.pageId, ids));
+                    await tx
+                        .delete(linkMetrics)
+                        .where(inArray(linkMetrics.pageId, ids));
+                }
+
+                await tx.delete(taskEvents).where(eq(taskEvents.jobId, id));
+                await tx.delete(scanPages).where(eq(scanPages.jobId, id));
+                await tx.delete(scanJobs).where(eq(scanJobs.id, id));
+            });
+
+            c.status(204);
+            return c.body(null);
         }
     );
 

@@ -18,17 +18,17 @@
 
 ## 阶段 2：数据输出与指标 API
 
-- [ ] **2.1** 编写页面级 API：`GET /api/scans/:id/pages`、`GET /api/scans/:id/pages/:pageId`（产出：Hono 路由；验收：支持分页/排序/搜索）
-- [ ] **2.2** 汇总指标计算（SEO/链接/埋点计分、严重问题统计）（产出：SQL 视图或 service；验收：`scan_jobs` 记录包含 summary JSON）
-- [ ] **2.3** 提供导出/清理接口（可选，如 `DELETE /api/scans/:id`）（产出：API 路由；验收：可删除历史数据）
+- [x] **2.1** 编写页面级 API：`GET /api/scans/:id/pages`、`GET /api/scans/:id/pages/:pageId`（产出：Hono 路由；验收：支持分页/排序/搜索）
+- [x] **2.2** 汇总指标计算（SEO/链接/埋点计分、严重问题统计）（产出：SQL 视图或 service；验收：`scan_jobs` 记录包含 summary JSON）
+- [x] **2.3** 提供导出/清理接口（可选，如 `DELETE /api/scans/:id`）（产出：API 路由；验收：可删除历史数据）
 
 ## 阶段 3：前端页面与交互
 
-- [ ] **3.1** 首页 `/`：表单 + 模式切换 + 高级设置组件（含整站深度输入，默认展示“sitemap 一层”）（产出：React 页面 + TanStack Form；验收：表单校验、可触发任务创建）
-- [ ] **3.2** 任务浮窗组件：订阅实时接口，展示最多 5 个任务进度并可跳转（产出：独立组件 + React Query subscription；验收：状态更新延迟 < 2s）
-- [ ] **3.3** 历史列表 `/history`：搜索、排序、过滤、列表 item UI（产出：页面 + Query + UI 组件；验收：分页/排序参数与 URL 同步）
-- [ ] **3.4** 历史详情 `/history/$scanId`：站点汇总、指标图表、页面表格、单页详情（产出：页面 + 图表组件；验收：支持单页/整站两种布局）
-- [ ] **3.5** 单页详情 `/history/$scanId/pages/$pageId`：展示 SEO/链接/埋点三个板块（产出：详情组件；验收：可复制数据并导出 JSON）
+- [x] **3.1** 首页 `/`：表单 + 模式切换 + 高级设置组件（含整站深度输入，默认展示“sitemap 一层”）（产出：React 页面 + TanStack Form；验收：表单校验、可触发任务创建）
+- [x] **3.2** 任务浮窗组件：订阅实时接口，展示最多 5 个任务进度并可跳转（产出：独立组件 + React Query subscription；验收：状态更新延迟 < 2s）
+- [x] **3.3** 历史列表 `/history`：搜索、排序、过滤、列表 item UI（产出：页面 + Query + UI 组件；验收：分页/排序参数与 URL 同步）
+- [x] **3.4** 历史详情 `/history/$scanId`：站点汇总、指标图表、页面表格、单页详情（产出：页面 + 图表组件；验收：支持单页/整站两种布局）
+- [x] **3.5** 单页详情 `/history/$scanId/pages/$pageId`：展示 SEO/链接/埋点三个板块（产出：详情组件；验收：可复制数据并导出 JSON）
 
 ## 阶段 4：体验与质量
 
