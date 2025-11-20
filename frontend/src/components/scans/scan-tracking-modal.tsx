@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { getScanByIdQueryOptions, useLiveScanEvents } from '@/lib/api/scans';
@@ -40,6 +40,11 @@ export function ScanTrackingModal({ scanId, isOpen, onClose }: ScanTrackingModal
     ? Math.min(100, Math.round(((scan.pagesFinished ?? 0) / scan.pagesTotal) * 100))
     : 0;
 
+  const handleViewResults = useCallback(() => {
+    navigate({ to: '/history/$scanId', params: { scanId: scanId.toString() } });
+    onClose();
+  }, [navigate, scanId, onClose]);
+
   // Auto-redirect when completed
   useEffect(() => {
     if (scan?.status === 'completed') {
@@ -63,12 +68,7 @@ export function ScanTrackingModal({ scanId, isOpen, onClose }: ScanTrackingModal
     if (autoRedirectCountdown === 0) {
       handleViewResults();
     }
-  }, [autoRedirectCountdown]);
-
-  const handleViewResults = () => {
-    navigate({ to: '/history/$scanId', params: { scanId: scanId.toString() } });
-    onClose();
-  };
+  }, [autoRedirectCountdown, handleViewResults]);
 
   const handleClose = () => {
     if (scan?.status === 'running' || scan?.status === 'pending') {

@@ -12,6 +12,7 @@ import { formatDateTime } from '@/lib/utils';
 import { Activity, Clock, Zap, CheckCircle2, AlertCircle, Loader2, XCircle, RotateCw, Trash2, Eye } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import type { ScanJob } from '@shared/types';
 
 export const Route = createFileRoute('/tasks')({
   component: TasksRoute,
@@ -323,7 +324,7 @@ function TasksRoute() {
 }
 
 type TaskCardProps = {
-  job: any;
+  job: ScanJob;
   isSelected: boolean;
   onToggleSelect: () => void;
   onCancel?: () => void;

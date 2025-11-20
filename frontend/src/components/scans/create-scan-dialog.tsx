@@ -37,7 +37,7 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                 userAgent: '',
                 requestTimeoutMs: 15000,
             },
-        },
+        } satisfies FormValues,
         onSubmit: async ({ value }) => {
             const { targetUrl, mode, options } = value;
             const normalizedOptions = Object.fromEntries(
@@ -109,7 +109,7 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                             <form.Field
                                 name="targetUrl"
                                 validators={{
-                                    onChange: ({ value }) =>
+                                    onChange: ({ value }: { value: string }) =>
                                         value && value.startsWith('http')
                                             ? undefined
                                             : '请输入合法的 URL（包含 http/https）',
@@ -184,7 +184,10 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                                                         min={1}
                                                         max={10}
                                                         value={field.state.value ?? 1}
-                                                        onChange={(e) => field.handleChange((e.target.valueAsNumber || undefined) as any)}
+                                                        onChange={(e) => {
+                                                            const val = e.target.valueAsNumber;
+                                                            field.handleChange(isNaN(val) ? 1 : val);
+                                                        }}
                                                         disabled={modeValue === 'single'}
                                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
                                                     />
@@ -200,7 +203,10 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                                                         min={1}
                                                         max={500}
                                                         value={field.state.value ?? 150}
-                                                        onChange={(e) => field.handleChange((e.target.valueAsNumber || undefined) as any)}
+                                                        onChange={(e) => {
+                                                            const val = e.target.valueAsNumber;
+                                                            field.handleChange(isNaN(val) ? 150 : val);
+                                                        }}
                                                         disabled={modeValue === 'single'}
                                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
                                                     />
@@ -233,7 +239,10 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                                                         min={2000}
                                                         max={60000}
                                                         value={field.state.value ?? 15000}
-                                                        onChange={(e) => field.handleChange((e.target.valueAsNumber || undefined) as any)}
+                                                        onChange={(e) => {
+                                                            const val = e.target.valueAsNumber;
+                                                            field.handleChange(isNaN(val) ? 15000 : val);
+                                                        }}
                                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                                     />
                                                 </label>

@@ -3,7 +3,7 @@ import {
   getScanByIdQueryOptions,
   getScanPagesQueryOptions,
 } from '@/lib/api/scans';
-import { formatDateTime, formatDuration, formatPercentage } from '@/lib/utils';
+import { formatDateTime, formatDuration } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import {
@@ -34,20 +34,22 @@ type DetailSearch = {
 
 const sanitizeSearch = (search: Record<string, unknown>): DetailSearch => ({
   page:
-    typeof search.page === 'number' && search.page > 0 ? search.page : undefined,
+    typeof search.page === 'number' && search.page > 0
+      ? search.page
+      : undefined,
   q: typeof search.q === 'string' ? search.q : '',
   status:
     search.status === 'pending' ||
-      search.status === 'processing' ||
-      search.status === 'completed' ||
-      search.status === 'failed'
+    search.status === 'processing' ||
+    search.status === 'completed' ||
+    search.status === 'failed'
       ? search.status
       : 'all',
   sort:
     search.sort === 'url' ||
-      search.sort === 'httpStatus' ||
-      search.sort === 'loadTimeMs' ||
-      search.sort === 'seoScore'
+    search.sort === 'httpStatus' ||
+    search.sort === 'loadTimeMs' ||
+    search.sort === 'seoScore'
       ? search.sort
       : 'createdAt',
   direction: search.direction === 'asc' ? 'asc' : 'desc',
@@ -74,7 +76,8 @@ function ScanDetailRoute() {
       limit,
       offset: (page - 1) * limit,
       search: search.q || undefined,
-      status: search.status && search.status !== 'all' ? search.status : undefined,
+      status:
+        search.status && search.status !== 'all' ? search.status : undefined,
       sort: search.sort ?? 'createdAt',
       direction: search.direction ?? 'desc',
     })
@@ -143,20 +146,24 @@ function ScanDetailRoute() {
                   {scan.completedAt && (
                     <div className="flex items-center gap-1.5">
                       <Timer className="h-3.5 w-3.5" />
-                      耗时 {formatDuration(new Date(scan.completedAt).getTime() - new Date(scan.startedAt!).getTime())}
+                      耗时{' '}
+                      {formatDuration(
+                        new Date(scan.completedAt).getTime() -
+                          new Date(scan.startedAt!).getTime()
+                      )}
                     </div>
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                {/* Actions if needed */}
-              </div>
+              <div className="flex gap-2">{/* Actions if needed */}</div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryCard
                 label="综合评分"
-                value={summary ? `${summary.scorecard.overallHealthPercent}%` : '--'}
+                value={
+                  summary ? `${summary.scorecard.overallHealthPercent}%` : '--'
+                }
                 icon={<LayoutDashboard className="h-5 w-5 text-indigo-500" />}
                 trend="结合 SEO / UTM / Tracking"
               />
@@ -168,13 +175,19 @@ function ScanDetailRoute() {
               />
               <SummaryCard
                 label="UTM 覆盖率"
-                value={summary ? `${summary.scorecard.utmCoveragePercent}%` : '--'}
+                value={
+                  summary ? `${summary.scorecard.utmCoveragePercent}%` : '--'
+                }
                 icon={<ExternalLink className="h-5 w-5 text-emerald-500" />}
                 trend="内部链接标记情况"
               />
               <SummaryCard
                 label="埋点覆盖 (Mixpanel/GA)"
-                value={summary ? `${summary.scorecard.trackingCoverage.mixpanel}% / ${summary.scorecard.trackingCoverage.ga}%` : '--'}
+                value={
+                  summary
+                    ? `${summary.scorecard.trackingCoverage.mixpanel}% / ${summary.scorecard.trackingCoverage.ga}%`
+                    : '--'
+                }
                 icon={<Clock className="h-5 w-5 text-amber-500" />}
                 trend="脚本检测率"
               />
@@ -213,7 +226,12 @@ function ScanDetailRoute() {
               <Filter className="h-4 w-4 text-slate-400" />
               <select
                 value={search.status ?? 'all'}
-                onChange={(e) => updateSearch({ status: e.target.value as DetailSearch['status'], page: 1 })}
+                onChange={(e) =>
+                  updateSearch({
+                    status: e.target.value as DetailSearch['status'],
+                    page: 1,
+                  })
+                }
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500"
               >
                 <option value="all">所有状态</option>
@@ -227,7 +245,9 @@ function ScanDetailRoute() {
               <ArrowUpDown className="h-4 w-4 text-slate-400" />
               <select
                 value={search.sort ?? 'createdAt'}
-                onChange={(e) => updateSearch({ sort: e.target.value as DetailSearch['sort'] })}
+                onChange={(e) =>
+                  updateSearch({ sort: e.target.value as DetailSearch['sort'] })
+                }
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500"
               >
                 <option value="createdAt">创建时间</option>
@@ -236,7 +256,11 @@ function ScanDetailRoute() {
                 <option value="loadTimeMs">加载耗时</option>
               </select>
               <button
-                onClick={() => updateSearch({ direction: search.direction === 'asc' ? 'desc' : 'asc' })}
+                onClick={() =>
+                  updateSearch({
+                    direction: search.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
                 className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"
                 title={search.direction === 'asc' ? '升序' : '降序'}
               >
@@ -262,19 +286,28 @@ function ScanDetailRoute() {
               <tbody className="divide-y divide-slate-100">
                 {pagesQuery.isPending ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-slate-500"
+                    >
                       加载数据中...
                     </td>
                   </tr>
                 ) : pages.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-slate-500"
+                    >
                       没有找到符合条件的页面
                     </td>
                   </tr>
                 ) : (
                   pages.map((pageItem) => (
-                    <tr key={pageItem.id} className="group hover:bg-slate-50 transition-colors">
+                    <tr
+                      key={pageItem.id}
+                      className="group hover:bg-slate-50 transition-colors"
+                    >
                       <td className="px-6 py-4 align-top">
                         <div className="max-w-md break-words font-medium text-slate-900">
                           {pageItem.url}
@@ -285,10 +318,15 @@ function ScanDetailRoute() {
                       </td>
                       <td className="px-6 py-4 align-top">
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${pageItem.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
-                              pageItem.status === 'failed' ? 'bg-rose-50 text-rose-700' :
-                                'bg-sky-50 text-sky-700'
-                            }`}>
+                          <span
+                            className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              pageItem.status === 'completed'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : pageItem.status === 'failed'
+                                  ? 'bg-rose-50 text-rose-700'
+                                  : 'bg-sky-50 text-sky-700'
+                            }`}
+                          >
                             {pageItem.status}
                           </span>
                           <span className="text-xs text-slate-500">
@@ -304,7 +342,10 @@ function ScanDetailRoute() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Globe className="h-3 w-3 text-slate-400" />
-                            SEO: <span className="font-medium">{pageItem.seo?.score ?? '--'}</span>
+                            SEO:{' '}
+                            <span className="font-medium">
+                              {pageItem.seo?.score ?? '--'}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -314,18 +355,20 @@ function ScanDetailRoute() {
                           <div className="flex flex-wrap gap-2 text-[11px]">
                             {(pageItem.links?.redirects ?? 0) > 0 && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 border border-amber-100">
-                                {pageItem.links.redirects} 重定向
+                                {pageItem.links?.redirects} 重定向
                               </span>
                             )}
                             {(pageItem.links?.brokenLinks ?? 0) > 0 && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 border border-rose-100">
-                                {pageItem.links.brokenLinks} 异常
+                                {pageItem.links?.brokenLinks} 异常
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
                             <LayoutDashboard className="h-3 w-3" />
-                            <span>{pageItem.trackingEvents.length} 个埋点事件</span>
+                            <span>
+                              {pageItem.trackingEvents.length} 个埋点事件
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -352,7 +395,9 @@ function ScanDetailRoute() {
           {/* Pagination */}
           <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
             <p className="text-sm text-slate-500">
-              显示 {pages.length > 0 ? (page - 1) * limit + 1 : 0} - {Math.min(page * limit, pagesQuery.data?.pagination.total ?? 0)} 条，共 {pagesQuery.data?.pagination.total ?? 0} 条
+              显示 {pages.length > 0 ? (page - 1) * limit + 1 : 0} -{' '}
+              {Math.min(page * limit, pagesQuery.data?.pagination.total ?? 0)}{' '}
+              条，共 {pagesQuery.data?.pagination.total ?? 0} 条
             </p>
             <div className="flex gap-2">
               <button
@@ -364,7 +409,9 @@ function ScanDetailRoute() {
                 上一页
               </button>
               <button
-                onClick={() => updateSearch({ page: Math.min(totalPages, page + 1) })}
+                onClick={() =>
+                  updateSearch({ page: Math.min(totalPages, page + 1) })
+                }
                 disabled={page >= totalPages}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
               >
@@ -406,19 +453,7 @@ type PageUtmSummary = NonNullable<
   NonNullable<ScanPageWithMetrics['links']>['utmSummary']
 >;
 
-const calculateCoverage = (utmSummary?: PageUtmSummary | null) => {
-  if (!utmSummary) return undefined;
-  const total = (utmSummary.trackedLinks ?? 0) + (utmSummary.missingUtm ?? 0);
-  if (total === 0) return undefined;
-  return Math.round(((utmSummary.trackedLinks ?? 0) / total) * 100);
-};
-
-
-const UtmInlineList = ({
-  summary,
-}: {
-  summary?: PageUtmSummary | null;
-}) => {
+const UtmInlineList = ({ summary }: { summary?: PageUtmSummary | null }) => {
   const examples = summary?.examples ?? [];
   if (examples.length === 0) {
     return <p className="text-[11px] text-slate-400">暂无链接数据</p>;

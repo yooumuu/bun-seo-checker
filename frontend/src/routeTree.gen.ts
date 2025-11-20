@@ -8,90 +8,39 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-// Import Routes
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as HistoryIndexRouteImport } from './routes/history/index'
+import { Route as HistoryScanIdIndexRouteImport } from './routes/history/$scanId/index'
+import { Route as HistoryScanIdPagesPageIdRouteImport } from './routes/history/$scanId/pages/$pageId'
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as TasksImport } from './routes/tasks'
-import { Route as IndexImport } from './routes/index'
-import { Route as HistoryIndexImport } from './routes/history/index'
-import { Route as HistoryScanIdIndexImport } from './routes/history/$scanId/index'
-import { Route as HistoryScanIdPagesPageIdImport } from './routes/history/$scanId/pages/$pageId'
-
-// Create/Update Routes
-
-const TasksRoute = TasksImport.update({
+const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const IndexRoute = IndexImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const HistoryIndexRoute = HistoryIndexImport.update({
+const HistoryIndexRoute = HistoryIndexRouteImport.update({
   id: '/history/',
   path: '/history/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const HistoryScanIdIndexRoute = HistoryScanIdIndexImport.update({
+const HistoryScanIdIndexRoute = HistoryScanIdIndexRouteImport.update({
   id: '/history/$scanId/',
   path: '/history/$scanId/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const HistoryScanIdPagesPageIdRoute = HistoryScanIdPagesPageIdImport.update({
-  id: '/history/$scanId/pages/$pageId',
-  path: '/history/$scanId/pages/$pageId',
-  getParentRoute: () => rootRoute,
-} as any)
-
-// Populate the FileRoutesByPath interface
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
-    '/tasks': {
-      id: '/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof TasksImport
-      parentRoute: typeof rootRoute
-    }
-    '/history/': {
-      id: '/history/'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof HistoryIndexImport
-      parentRoute: typeof rootRoute
-    }
-    '/history/$scanId/': {
-      id: '/history/$scanId/'
-      path: '/history/$scanId'
-      fullPath: '/history/$scanId'
-      preLoaderRoute: typeof HistoryScanIdIndexImport
-      parentRoute: typeof rootRoute
-    }
-    '/history/$scanId/pages/$pageId': {
-      id: '/history/$scanId/pages/$pageId'
-      path: '/history/$scanId/pages/$pageId'
-      fullPath: '/history/$scanId/pages/$pageId'
-      preLoaderRoute: typeof HistoryScanIdPagesPageIdImport
-      parentRoute: typeof rootRoute
-    }
-  }
-}
-
-// Create and export the route tree
+const HistoryScanIdPagesPageIdRoute =
+  HistoryScanIdPagesPageIdRouteImport.update({
+    id: '/history/$scanId/pages/$pageId',
+    path: '/history/$scanId/pages/$pageId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,7 +49,6 @@ export interface FileRoutesByFullPath {
   '/history/$scanId': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
-
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/tasks': typeof TasksRoute
@@ -108,16 +56,14 @@ export interface FileRoutesByTo {
   '/history/$scanId': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
-
 export interface FileRoutesById {
-  __root__: typeof rootRoute
+  __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/tasks': typeof TasksRoute
   '/history/': typeof HistoryIndexRoute
   '/history/$scanId/': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
 }
-
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
@@ -142,13 +88,52 @@ export interface FileRouteTypes {
     | '/history/$scanId/pages/$pageId'
   fileRoutesById: FileRoutesById
 }
-
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TasksRoute: typeof TasksRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   HistoryScanIdIndexRoute: typeof HistoryScanIdIndexRoute
   HistoryScanIdPagesPageIdRoute: typeof HistoryScanIdPagesPageIdRoute
+}
+
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history/': {
+      id: '/history/'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history/$scanId/': {
+      id: '/history/$scanId/'
+      path: '/history/$scanId'
+      fullPath: '/history/$scanId'
+      preLoaderRoute: typeof HistoryScanIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history/$scanId/pages/$pageId': {
+      id: '/history/$scanId/pages/$pageId'
+      path: '/history/$scanId/pages/$pageId'
+      fullPath: '/history/$scanId/pages/$pageId'
+      preLoaderRoute: typeof HistoryScanIdPagesPageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -158,39 +143,6 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryScanIdIndexRoute: HistoryScanIdIndexRoute,
   HistoryScanIdPagesPageIdRoute: HistoryScanIdPagesPageIdRoute,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/",
-        "/tasks",
-        "/history/",
-        "/history/$scanId/",
-        "/history/$scanId/pages/$pageId"
-      ]
-    },
-    "/": {
-      "filePath": "index.tsx"
-    },
-    "/tasks": {
-      "filePath": "tasks.tsx"
-    },
-    "/history/": {
-      "filePath": "history/index.tsx"
-    },
-    "/history/$scanId/": {
-      "filePath": "history/$scanId/index.tsx"
-    },
-    "/history/$scanId/pages/$pageId": {
-      "filePath": "history/$scanId/pages/$pageId.tsx"
-    }
-  }
-}
-ROUTE_MANIFEST_END */
