@@ -8,7 +8,7 @@ COPY frontend/package.json frontend/bun.lock ./frontend/
 
 # Install frontend dependencies
 WORKDIR /app/frontend
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy server files (needed for frontend build to resolve @shared types)
 WORKDIR /app
@@ -73,7 +73,7 @@ RUN apt-get update && \
 COPY package.json bun.lock ./
 
 # Install backend dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Install playwright browsers
 RUN bunx playwright install chromium
