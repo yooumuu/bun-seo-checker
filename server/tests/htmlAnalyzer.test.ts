@@ -116,7 +116,7 @@ describe("HTML analyzer helpers", () => {
 
         expect(summary.seo.missingTitle).toBe(true);
         expect(summary.seo.missingDescription).toBe(true);
-        expect(summary.links.utmMissing).toBe(0);
+        expect(summary.links.utmMissing).toBe(1); // missingHtml has 1 internal link without UTM
         expect(summary.tracking.mixpanelMissing).toBe(true);
         expect(summary.totals.seoIssues).toBeGreaterThan(0);
         expect(summary.meta.seoScore).toBeGreaterThanOrEqual(0);

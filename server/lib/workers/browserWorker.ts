@@ -13,6 +13,7 @@ export interface BrowserScanResult {
         heading?: string;
         utmParams: Record<string, string>;
         selector: string;
+        trackingConfig?: Record<string, any> | null;
         triggeredEvents?: Array<{ type: string; payload: any; platform: string }>;
     }>;
     trackingEvents: Array<{
@@ -85,6 +86,8 @@ export class BrowserWorker {
             // 1. Inject Tracking Hooks
             await page.addInitScript(() => {
                 (window as any).__trackingLog = [];
+                (window as any).__mixpanelHooked = false;
+
                 const pushEvent = (platform: string, type: string, payload: any) => {
                     (window as any).__trackingLog.push({
                         platform,
@@ -94,25 +97,55 @@ export class BrowserWorker {
                     });
                 };
 
-                // Hook Mixpanel
+                // Hook Mixpanel - Enhanced version
                 const wrap = (obj: any, method: string, platform: string) => {
-                    if (!obj || !obj[method] || obj[method].__hooked) return;
+                    if (!obj || !obj[method] || obj[method].__hooked) return false;
                     const original = obj[method];
                     obj[method] = function (...args: any[]) {
                         pushEvent(platform, method, args);
                         try { return original.apply(this, args); } catch (err) { throw err; }
                     };
                     obj[method].__hooked = true;
+                    return true;
                 };
 
                 const hookMixpanel = () => {
                     try {
                         const mp = (window as any).mixpanel;
-                        if (mp) {
-                            if (typeof mp.track === 'function') wrap(mp, 'track', 'mixpanel');
-                            if (Array.isArray(mp)) wrap(mp, 'push', 'mixpanel');
+                        if (!mp) return;
+
+                        // Hook all Mixpanel methods
+                        const methods = ['track', 'identify', 'alias', 'register', 'reset', 'time_event', 'track_links', 'track_forms'];
+                        let hookedAny = false;
+
+                        methods.forEach(method => {
+                            if (typeof mp[method] === 'function' && wrap(mp, method, 'mixpanel')) {
+                                hookedAny = true;
+                            }
+                        });
+
+                        // Hook people methods
+                        if (mp.people && typeof mp.people === 'object') {
+                            const peopleMethods = ['set', 'set_once', 'increment', 'append', 'union', 'track_charge'];
+                            peopleMethods.forEach(method => {
+                                if (typeof mp.people[method] === 'function' && wrap(mp.people, method, 'mixpanel')) {
+                                    hookedAny = true;
+                                }
+                            });
                         }
-                    } catch (e) { }
+
+                        // Hook array-based queue (for pre-initialization)
+                        if (Array.isArray(mp) && wrap(mp, 'push', 'mixpanel')) {
+                            hookedAny = true;
+                        }
+
+                        if (hookedAny && !(window as any).__mixpanelHooked) {
+                            (window as any).__mixpanelHooked = true;
+                            console.log('[Tracking Hook] Mixpanel SDK hooked successfully');
+                        }
+                    } catch (e) {
+                        console.error('[Tracking Hook] Failed to hook Mixpanel:', e);
+                    }
                 };
 
                 // 1. Try immediate hook
@@ -127,24 +160,44 @@ export class BrowserWorker {
                         get() { return _mixpanel; },
                         set(val) {
                             _mixpanel = val;
-                            hookMixpanel();
+                            setTimeout(() => hookMixpanel(), 0); // Defer to allow SDK initialization
                         }
                     });
                 } catch (e) {
-                    // Property might be non-configurable
+                    console.warn('[Tracking Hook] Cannot define mixpanel property:', e);
                 }
 
-                // 3. Polling fallback (every 200ms)
-                setInterval(hookMixpanel, 200);
+                // 3. Polling fallback - check more frequently initially, then slow down
+                let pollCount = 0;
+                const pollInterval = setInterval(() => {
+                    hookMixpanel();
+                    pollCount++;
+
+                    // Stop polling after 20 attempts (4 seconds at 200ms intervals)
+                    if (pollCount >= 20 && (window as any).__mixpanelHooked) {
+                        clearInterval(pollInterval);
+                        console.log('[Tracking Hook] Stopped Mixpanel polling');
+                    }
+                }, 200);
+
+                // 4. Listen for DOMContentLoaded and load events
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        setTimeout(hookMixpanel, 100);
+                    });
+                }
+                window.addEventListener('load', () => {
+                    setTimeout(hookMixpanel, 500);
+                });
 
                 // Hook GA / Gtag
-                wrap(window, 'gtag', 'gtag');
+                wrap(window, 'gtag', 'ga');
 
-                // Hook DataLayer
+                // Hook DataLayer (GTM) - 统一归类为 ga 平台
                 const originalPush = (window as any).dataLayer?.push;
                 if ((window as any).dataLayer) {
                     (window as any).dataLayer.push = function (...args: any[]) {
-                        pushEvent('dataLayer', 'dataLayer.push', args);
+                        pushEvent('ga', 'dataLayer.push', args);
                         return originalPush.apply(this, args);
                     };
                 } else {
@@ -157,7 +210,7 @@ export class BrowserWorker {
                             if (val && val.push) {
                                 const orig = val.push;
                                 val.push = function (...args: any[]) {
-                                    pushEvent('dataLayer', 'dataLayer.push', args);
+                                    pushEvent('ga', 'dataLayer.push', args);
                                     return orig.apply(this, args);
                                 };
                             }
@@ -169,8 +222,9 @@ export class BrowserWorker {
             // 2. Navigate
             await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
 
-            // Wait a bit for hydration
-            await page.waitForTimeout(2000);
+            // Wait longer for hydration and analytics SDK loading
+            // Many analytics scripts load asynchronously after page load
+            await page.waitForTimeout(4000);
 
             // 3. Extract Content & Links
             result.html = await page.content();
@@ -230,6 +284,47 @@ export class BrowserWorker {
                     return path.join(' > ');
                 };
 
+                // Helper: Extract tracking configuration from element
+                const extractTrackingConfig = (el: HTMLAnchorElement) => {
+                    const config: any = {};
+
+                    // Check for data-* attributes related to tracking
+                    const trackingDataAttrs = [
+                        'data-mixpanel-event',
+                        'data-mixpanel-properties',
+                        'data-track-event',
+                        'data-track-name',
+                        'data-analytics-event',
+                        'data-analytics-label',
+                        'data-ga-event',
+                        'data-ga-label',
+                        'data-gtm-event',
+                    ];
+
+                    trackingDataAttrs.forEach(attr => {
+                        const value = el.getAttribute(attr);
+                        if (value) {
+                            config[attr] = value;
+                        }
+                    });
+
+                    // Check for onclick attribute (may contain tracking calls)
+                    const onclick = el.getAttribute('onclick');
+                    if (onclick) {
+                        config['onclick'] = onclick;
+
+                        // Try to detect tracking calls in onclick
+                        if (/mixpanel\.track|mp\.track/i.test(onclick)) {
+                            config['has_mixpanel_in_onclick'] = true;
+                        }
+                        if (/gtag\(|ga\(/i.test(onclick)) {
+                            config['has_ga_in_onclick'] = true;
+                        }
+                    }
+
+                    return Object.keys(config).length > 0 ? config : null;
+                };
+
                 // Phase 1: Collect all link metadata (Static Analysis)
                 // We do this first so that if the page crashes/navigates during clicking, we still have the link list.
                 const results = anchors.map((anchor) => {
@@ -242,6 +337,8 @@ export class BrowserWorker {
                         }
                     });
 
+                    const trackingConfig = extractTrackingConfig(a);
+
                     return {
                         url: a.href,
                         text: a.innerText,
@@ -249,6 +346,7 @@ export class BrowserWorker {
                         heading: findNearestHeading(a),
                         utmParams: params,
                         selector: getSelector(a),
+                        trackingConfig: trackingConfig,
                         triggeredEvents: [] as any[]
                     };
                 });

@@ -463,8 +463,9 @@ export const analyzeTracking = (html: string): TrackingEventAnalysis[] => {
     const events: TrackingEventAnalysis[] = [];
     const lower = html.toLowerCase();
 
+    // Mixpanel: track() - 事件追踪
     const mixpanelEventRegex =
-        /(?:window(?:\?\.)?\.)?mixpanel(?:\?\.)?\.track\s*\(\s*(['"`])([^'"`]+)\1/gi;
+        /(?:window\?\.)?mixpanel\?\.track\s*\(\s*(['"`])([^'"`]+)\1/gi;
     events.push(
         ...extractMatches(html, mixpanelEventRegex, (match) => ({
             element: "script",
@@ -475,7 +476,188 @@ export const analyzeTracking = (html: string): TrackingEventAnalysis[] => {
         }))
     );
 
-    if (events.length === 0 && /mixpanel/.test(lower)) {
+    // Mixpanel: init() - SDK 初始化
+    const mixpanelInitRegex =
+        /(?:window\?\.)?mixpanel\?\.init\s*\(\s*(['"`])([^'"`]+)\1/gi;
+    events.push(
+        ...extractMatches(html, mixpanelInitRegex, (match) => ({
+            element: "script",
+            trigger: "init",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: `Token: ${match[2]?.trim() ?? 'unknown'}`,
+        }))
+    );
+
+    // Mixpanel: identify() - 用户识别
+    const mixpanelIdentifyRegex =
+        /(?:window\?\.)?mixpanel\?\.identify\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelIdentifyRegex, () => ({
+            element: "script",
+            trigger: "identify",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "User Identify",
+        }))
+    );
+
+    // Mixpanel: alias() - 用户别名
+    const mixpanelAliasRegex =
+        /(?:window\?\.)?mixpanel\?\.alias\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelAliasRegex, () => ({
+            element: "script",
+            trigger: "alias",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "User Alias",
+        }))
+    );
+
+    // Mixpanel: register() - 全局属性注册
+    const mixpanelRegisterRegex =
+        /(?:window\?\.)?mixpanel\?\.register\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelRegisterRegex, () => ({
+            element: "script",
+            trigger: "register",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Register Properties",
+        }))
+    );
+
+    // Mixpanel: people.set() - 用户属性设置
+    const mixpanelPeopleSetRegex =
+        /(?:window\?\.)?mixpanel\?\.people\?\.set\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelPeopleSetRegex, () => ({
+            element: "script",
+            trigger: "people.set",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Set User Properties",
+        }))
+    );
+
+    // Mixpanel: people.set_once() - 用户属性设置（仅一次）
+    const mixpanelPeopleSetOnceRegex =
+        /(?:window\?\.)?mixpanel\?\.people\?\.set_once\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelPeopleSetOnceRegex, () => ({
+            element: "script",
+            trigger: "people.set_once",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Set User Properties Once",
+        }))
+    );
+
+    // Mixpanel: people.increment() - 增量更新
+    const mixpanelPeopleIncrementRegex =
+        /(?:window\?\.)?mixpanel\?\.people\?\.increment\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelPeopleIncrementRegex, () => ({
+            element: "script",
+            trigger: "people.increment",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Increment User Property",
+        }))
+    );
+
+    // Mixpanel: time_event() - 事件计时
+    const mixpanelTimeEventRegex =
+        /(?:window\?\.)?mixpanel\?\.time_event\s*\(\s*(['"`])([^'"`]+)\1/gi;
+    events.push(
+        ...extractMatches(html, mixpanelTimeEventRegex, (match) => ({
+            element: "script",
+            trigger: "time_event",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: `Time: ${match[2]?.trim() ?? 'unknown'}`,
+        }))
+    );
+
+    // Mixpanel: track_links() - 链接追踪配置
+    const mixpanelTrackLinksRegex =
+        /(?:window\?\.)?mixpanel\?\.track_links\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelTrackLinksRegex, () => ({
+            element: "script",
+            trigger: "track_links",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Link Tracking Configured",
+        }))
+    );
+
+    // Mixpanel: track_forms() - 表单追踪配置
+    const mixpanelTrackFormsRegex =
+        /(?:window\?\.)?mixpanel\?\.track_forms\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelTrackFormsRegex, () => ({
+            element: "script",
+            trigger: "track_forms",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Form Tracking Configured",
+        }))
+    );
+
+    // Mixpanel: reset() - 重置用户
+    const mixpanelResetRegex =
+        /(?:window\?\.)?mixpanel\?\.reset\s*\(/gi;
+    events.push(
+        ...extractMatches(html, mixpanelResetRegex, () => ({
+            element: "script",
+            trigger: "reset",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "User Reset",
+        }))
+    );
+
+    // 检测 Mixpanel SDK 加载（脚本标签）
+    const mixpanelScriptRegex = /<script[^>]*src\s*=\s*["']([^"']*mixpanel[^"']*)["']/gi;
+    events.push(
+        ...extractMatches(html, mixpanelScriptRegex, (match) => ({
+            element: "script",
+            trigger: "sdk_load",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: `SDK: ${match[1]?.trim() ?? 'unknown'}`,
+        }))
+    );
+
+    // 检测 Mixpanel Autotrack - 自动追踪配置
+    // 方式1: mixpanel.init(..., {track_pageview: true, track_links_timeout: ...})
+    const autotrackInitRegex = /mixpanel\?\.init\s*\([^)]*\{[^}]*(?:track_pageview|track_links_timeout|autotrack|auto_track)[^}]*\}/gi;
+    if (autotrackInitRegex.test(html)) {
+        events.push({
+            element: "script",
+            trigger: "autotrack",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Autotrack Enabled (via init config)",
+        });
+    }
+
+    // 方式2: mixpanel.set_config({autotrack: true})
+    const autotrackConfigRegex = /mixpanel\?\.set_config\s*\(\s*\{[^}]*autotrack[^}]*\}/gi;
+    if (autotrackConfigRegex.test(html)) {
+        events.push({
+            element: "script",
+            trigger: "autotrack",
+            platform: "mixpanel",
+            status: "detected",
+            eventName: "Autotrack Enabled (via set_config)",
+        });
+    }
+
+    // 如果没有检测到任何 Mixpanel API，但页面包含 mixpanel 关键字
+    if (events.filter(e => e.platform === "mixpanel").length === 0 && /mixpanel/.test(lower)) {
         events.push({
             element: "script",
             trigger: "load",
