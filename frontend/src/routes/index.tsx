@@ -1,335 +1,140 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useForm, useStore } from '@tanstack/react-form';
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getScansQueryOptions,
-  useCreateScanMutation,
-} from '@/lib/api/scans';
-import type { ScanIssuesSummary, ScanJob } from '@shared/types';
-import { cn, formatDateTime } from '@/lib/utils';
-import { ModeBadge, StatusBadge } from '@/components/scan-badges';
-
-type FormValues = {
-  targetUrl: string;
-  mode: ScanJob['mode'];
-  options: {
-    siteDepth?: number;
-    maxPages?: number;
-    userAgent?: string;
-    requestTimeoutMs?: number;
-  };
-};
+import { getScansQueryOptions } from '@/lib/api/scans';
+import { useState } from 'react';
+import { CreateScanDialog } from '@/components/scans/create-scan-dialog';
+import { ScanCard } from '@/components/scans/scan-card';
+import { Plus, ArrowRight, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const Route = createFileRoute('/')({
   component: HomeRoute,
 });
 
 function HomeRoute() {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const createMutation = useCreateScanMutation();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const recentScans = useQuery(
-    getScansQueryOptions({ limit: 5, sort: 'createdAt', direction: 'desc' })
+    getScansQueryOptions({ limit: 6, sort: 'createdAt', direction: 'desc' })
   );
 
-  const form = useForm<
-    FormValues,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined
-  >({
-    defaultValues: {
-      targetUrl: '',
-      mode: 'single',
-      options: {
-        siteDepth: 2,
-        maxPages: 150,
-        userAgent: '',
-        requestTimeoutMs: 15000,
-      },
-    },
-    onSubmit: async ({ value }) => {
-      const { targetUrl, mode, options } = value;
-      const normalizedOptions = Object.fromEntries(
-        Object.entries(options).filter(
-          ([, v]) => v !== undefined && v !== null && v !== ''
-        )
-      );
-      await createMutation.mutateAsync({
-        targetUrl,
-        mode,
-        options:
-          Object.keys(normalizedOptions).length > 0
-            ? (normalizedOptions as FormValues['options'])
-            : undefined,
-      });
-      form.reset();
-    },
-  });
-
-  const canSubmit = useStore(form.store, (state) => state.canSubmit);
-  const modeValue = useStore(form.store, (state) => state.values.mode);
+  // Calculate some dummy stats for now (or real ones if available)
+  const totalScans = recentScans.data?.pagination.total ?? 0;
+  const completedScans = recentScans.data?.jobs.filter(j => j.status === 'completed').length ?? 0;
 
   return (
-    <div className="space-y-10">
-      <section className="grid gap-8 rounded-2xl bg-white p-8 shadow-sm lg:grid-cols-2">
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">
-            全栈 SEO / 埋点巡检
-          </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
-            输入网址，几秒钟内了解 SEO、UTM、埋点状态
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 px-8 py-12 text-white shadow-xl sm:px-12 sm:py-16">
+        <div className="relative z-10 max-w-2xl space-y-6">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            全栈 SEO 与埋点巡检
           </h1>
-          <p className="text-base text-slate-600">
-            支持单页和整站模式，实时查看扫描进度，保留历史记录。可配置抓取深度、
-            最大页面数、User-Agent 等高级参数。
+          <p className="text-lg text-indigo-100">
+            一键扫描，实时洞察。支持单页分析与整站爬取，自动检测 SEO 标签、UTM 参数及埋点覆盖率。
           </p>
-          <ul className="space-y-3 text-sm text-slate-700">
-            <li>• 并发任务限制自动控制，后台持续执行</li>
-            <li>• 自动解析标题、描述、UTM 链接和埋点脚本</li>
-            <li>• 历史详情支持搜索、排序、筛选和导出</li>
-          </ul>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void form.handleSubmit();
-          }}
-          className="rounded-2xl border border-slate-200 bg-slate-50/60 p-6 shadow-inner"
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700">
-                目标 URL
-              </label>
-              <form.Field
-                name="targetUrl"
-                validators={{
-                  onChange: ({ value }) =>
-                    value && value.startsWith('http')
-                      ? undefined
-                      : '请输入合法的 URL（包含 http/https）',
-                }}
-              >
-                {(field) => (
-                  <>
-                    <input
-                      type="url"
-                      value={field.state.value}
-                      onChange={(event) =>
-                        field.handleChange(event.target.value)
-                      }
-                      placeholder="https://example.com"
-                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    />
-                    {field.state.meta.errors[0] ? (
-                      <p className="mt-1 text-xs text-rose-600">
-                        {field.state.meta.errors[0]}
-                      </p>
-                    ) : null}
-                  </>
-                )}
-              </form.Field>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium text-slate-700">扫描模式</p>
-              <div className="mt-2 flex gap-2">
-                {(['single', 'site'] as const).map((mode) => (
-                  <button
-                    type="button"
-                    key={mode}
-                    onClick={() => form.setFieldValue('mode', mode)}
-                    className={cn(
-                      'flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition',
-                      modeValue === mode
-                        ? 'border-sky-500 bg-white text-sky-600 shadow-sm'
-                        : 'border-slate-200 text-slate-500 hover:text-slate-700'
-                    )}
-                  >
-                    {mode === 'single' ? '单页' : '整站'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-white/80 p-4 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced((prev) => !prev)}
-                className="flex w-full items-center justify-between text-sm font-medium text-slate-600"
-              >
-                <span>高级设置</span>
-                <span>{showAdvanced ? '收起' : '展开'}</span>
-              </button>
-              {showAdvanced ? (
-                <div className="mt-4 space-y-4 text-sm">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <form.Field name="options.siteDepth">
-                      {(field) => (
-                        <label className="flex flex-col gap-1 text-slate-600">
-                          整站深度
-                          <input
-                            type="number"
-                            min={1}
-                            max={10}
-                            value={field.state.value ?? 2}
-                            onChange={(event) =>
-                              field.handleChange(
-                                Number(event.target.value) || undefined
-                              )
-                            }
-                            disabled={modeValue === 'single'}
-                            className="rounded-lg border border-slate-300 px-3 py-2"
-                          />
-                        </label>
-                      )}
-                    </form.Field>
-                    <form.Field name="options.maxPages">
-                      {(field) => (
-                        <label className="flex flex-col gap-1 text-slate-600">
-                          最大页数
-                          <input
-                            type="number"
-                            min={1}
-                            max={500}
-                            value={field.state.value ?? 150}
-                            onChange={(event) =>
-                              field.handleChange(
-                                Number(event.target.value) || undefined
-                              )
-                            }
-                            disabled={modeValue === 'single'}
-                            className="rounded-lg border border-slate-300 px-3 py-2"
-                          />
-                        </label>
-                      )}
-                    </form.Field>
-                  </div>
-                  <form.Field name="options.userAgent">
-                    {(field) => (
-                      <label className="flex flex-col gap-1 text-slate-600">
-                        自定义 User-Agent
-                        <input
-                          type="text"
-                          value={field.state.value ?? ''}
-                          onChange={(event) =>
-                            field.handleChange(event.target.value)
-                          }
-                          placeholder="可选，例如 Chrome/120..."
-                          className="rounded-lg border border-slate-300 px-3 py-2"
-                        />
-                      </label>
-                    )}
-                  </form.Field>
-                  <form.Field name="options.requestTimeoutMs">
-                    {(field) => (
-                      <label className="flex flex-col gap-1 text-slate-600">
-                        请求超时 (ms)
-                        <input
-                          type="number"
-                          min={2000}
-                          max={60000}
-                          value={field.state.value ?? 15000}
-                          onChange={(event) =>
-                            field.handleChange(
-                              Number(event.target.value) || undefined
-                            )
-                          }
-                          className="rounded-lg border border-slate-300 px-3 py-2"
-                        />
-                      </label>
-                    )}
-                  </form.Field>
-                </div>
-              ) : null}
-            </div>
-
+          <div className="flex flex-wrap gap-4 pt-2">
             <button
-              type="submit"
-              disabled={!canSubmit || createMutation.isPending}
-              className="w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-200 disabled:cursor-not-allowed disabled:bg-slate-300"
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-indigo-600 shadow-lg transition-transform hover:scale-105 hover:bg-indigo-50"
             >
-              {createMutation.isPending ? '排队中…' : '开始检测'}
+              <Plus className="h-5 w-5" />
+              新建扫描任务
             </button>
-            {createMutation.isSuccess ? (
-              <p className="text-xs text-emerald-600">
-                任务已进入队列，稍后查看历史列表或右下角浮窗。
-              </p>
-            ) : null}
-            {createMutation.isError ? (
-              <p className="text-xs text-rose-600">
-                创建任务失败：{createMutation.error?.message}
-              </p>
-            ) : null}
+            <Link
+              to="/history"
+              className="flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/20 px-6 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-indigo-500/30"
+            >
+              查看历史记录
+            </Link>
           </div>
-        </form>
+        </div>
+
+        {/* Decorative background elements */}
+        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-indigo-500/30 blur-3xl" />
+        <div className="absolute -bottom-32 right-20 h-80 w-80 rounded-full bg-violet-500/30 blur-3xl" />
       </section>
 
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <Activity className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">总扫描次数</p>
+              <p className="text-2xl font-bold text-foreground">{totalScans}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">最近成功</p>
+              <p className="text-2xl font-bold text-foreground">{completedScans}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">发现问题</p>
+              <p className="text-2xl font-bold text-foreground">--</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Scans */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">最近扫描</h2>
-          <Link to="/history" className="text-sm font-medium text-sky-600">
-            查看全部 →
+          <h2 className="text-xl font-bold text-foreground">最近扫描</h2>
+          <Link
+            to="/history"
+            className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+          >
+            查看全部 <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {recentScans.data?.jobs.map((job) => {
-            const summary = job.issuesSummary as ScanIssuesSummary | null;
-            return (
-            <Link
-              key={job.id}
-              to="/history/$scanId"
-              params={{ scanId: job.id.toString() }}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-lg"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {job.targetUrl}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {formatDateTime(job.createdAt)}
-                  </p>
-                </div>
-                <ModeBadge mode={job.mode} />
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {recentScans.isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-48 animate-pulse rounded-2xl bg-muted/50" />
+            ))
+          ) : recentScans.data?.jobs.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 py-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <Activity className="h-8 w-8 text-muted-foreground" />
               </div>
-              <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                <StatusBadge status={job.status} />
-                <p>
-                  {job.pagesFinished}/{job.pagesTotal} 页
-                </p>
-              </div>
-              {summary ? (
-                <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                  <p>
-                    综合评分：{' '}
-                    <span className="font-semibold text-slate-900">
-                      {summary.scorecard.overallHealthPercent}%
-                    </span>
-                  </p>
-                  <p>
-                    SEO 平均分：{summary.scorecard.seoAverageScore} ·
-                    UTM 覆盖：{summary.scorecard.utmCoveragePercent}%
-                  </p>
-                </div>
-              ) : null}
-            </Link>
-          );})}
-          {recentScans.data?.jobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-              暂无历史记录，创建第一个扫描任务吧。
+              <h3 className="mt-4 text-lg font-semibold text-foreground">暂无扫描记录</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                创建一个新的扫描任务来开始分析您的网站。
+              </p>
+              <button
+                onClick={() => setIsCreateOpen(true)}
+                className="mt-6 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                立即开始
+              </button>
             </div>
-          ) : null}
+          ) : (
+            recentScans.data?.jobs.map((job) => (
+              <ScanCard key={job.id} job={job} />
+            ))
+          )}
         </div>
       </section>
+
+      <CreateScanDialog
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
     </div>
   );
 }
