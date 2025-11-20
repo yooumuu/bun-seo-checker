@@ -156,6 +156,22 @@ export const deleteScan = async (scanId: number | string) => {
   }
 };
 
+export const cancelScan = async (scanId: number | string) => {
+  return handleResponse<{ success: boolean; message: string }>(
+    api.scans[':id'].cancel.$post({
+      param: { id: String(scanId) },
+    })
+  );
+};
+
+export const retryScan = async (scanId: number | string) => {
+  return handleResponse<{ success: boolean; message: string }>(
+    api.scans[':id'].retry.$post({
+      param: { id: String(scanId) },
+    })
+  );
+};
+
 export const useCreateScanMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -174,6 +190,28 @@ export const useDeleteScanMutation = () => {
       queryClient.invalidateQueries({ queryKey: ['scans'] });
       queryClient.invalidateQueries({ queryKey: ['scan', scanId] });
       queryClient.invalidateQueries({ queryKey: ['scan-pages'] });
+    },
+  });
+};
+
+export const useCancelScanMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scanId: number) => cancelScan(scanId),
+    onSuccess: (_data, scanId) => {
+      queryClient.invalidateQueries({ queryKey: ['scans'] });
+      queryClient.invalidateQueries({ queryKey: ['scan', scanId] });
+    },
+  });
+};
+
+export const useRetryScanMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scanId: number) => retryScan(scanId),
+    onSuccess: (_data, scanId) => {
+      queryClient.invalidateQueries({ queryKey: ['scans'] });
+      queryClient.invalidateQueries({ queryKey: ['scan', scanId] });
     },
   });
 };

@@ -82,6 +82,10 @@ const sortColumns = {
 } as const;
 
 const app = new Hono()
+    .get("/queue/state", async (c) => {
+        const state = scanScheduler.getState();
+        return c.json(state);
+    })
     .post(
         "/",
         zValidator("json", createScanJobSchema),
@@ -306,6 +310,83 @@ const app = new Hono()
 
             c.status(204);
             return c.body(null);
+        }
+    )
+    .post(
+        "/:id/cancel",
+        zValidator("param", paramIdSchema),
+        async (c) => {
+            const { id } = c.req.valid("param");
+
+            const job = await db
+                .select()
+                .from(scanJobs)
+                .where(eq(scanJobs.id, id))
+                .limit(1)
+                .then((rows) => rows[0]);
+
+            if (!job) {
+                c.status(404);
+                return c.json({ error: "Job not found" });
+            }
+
+            if (job.status !== "running" && job.status !== "pending") {
+                c.status(409);
+                return c.json({
+                    error: "Job is not running. Only running or pending jobs can be cancelled.",
+                });
+            }
+
+            const cancelled = scanScheduler.cancel(id);
+
+            if (!cancelled) {
+                c.status(500);
+                return c.json({ error: "Failed to cancel job" });
+            }
+
+            return c.json({ success: true, message: "Job cancellation requested" });
+        }
+    )
+    .post(
+        "/:id/retry",
+        zValidator("param", paramIdSchema),
+        async (c) => {
+            const { id } = c.req.valid("param");
+
+            const job = await db
+                .select()
+                .from(scanJobs)
+                .where(eq(scanJobs.id, id))
+                .limit(1)
+                .then((rows) => rows[0]);
+
+            if (!job) {
+                c.status(404);
+                return c.json({ error: "Job not found" });
+            }
+
+            if (job.status !== "failed") {
+                c.status(409);
+                return c.json({
+                    error: "Job is not failed. Only failed jobs can be retried.",
+                });
+            }
+
+            // Reset job status to pending and clear error
+            await db
+                .update(scanJobs)
+                .set({
+                    status: "pending",
+                    error: null,
+                    startedAt: null,
+                    completedAt: null,
+                })
+                .where(eq(scanJobs.id, id));
+
+            // Re-enqueue the job
+            scanScheduler.enqueue(id);
+
+            return c.json({ success: true, message: "Job retry initiated" });
         }
     );
 

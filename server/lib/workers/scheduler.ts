@@ -12,6 +12,7 @@ export class ScanScheduler {
     private readonly queue: JobId[] = [];
     private readonly enqueued = new Set<JobId>();
     private readonly running = new Set<JobId>();
+    private readonly cancelRequested = new Set<JobId>();
     private started = false;
 
     start() {
@@ -36,7 +37,30 @@ export class ScanScheduler {
         return {
             queue: [...this.queue],
             running: [...this.running],
+            cancelRequested: [...this.cancelRequested],
         };
+    }
+
+    cancel(jobId: JobId): boolean {
+        // If it's in the queue (not yet running), remove it
+        const queueIndex = this.queue.indexOf(jobId);
+        if (queueIndex !== -1) {
+            this.queue.splice(queueIndex, 1);
+            this.enqueued.delete(jobId);
+            return true;
+        }
+
+        // If it's currently running, request cancellation
+        if (this.running.has(jobId)) {
+            this.cancelRequested.add(jobId);
+            return true;
+        }
+
+        return false;
+    }
+
+    isCancelRequested(jobId: JobId): boolean {
+        return this.cancelRequested.has(jobId);
     }
 
     private async resumePendingJobs() {
@@ -66,12 +90,13 @@ export class ScanScheduler {
     private run(jobId: JobId) {
         this.running.add(jobId);
 
-        runScanJob(jobId)
+        runScanJob(jobId, this)
             .catch((error) => {
                 console.error(`[scheduler] Job ${jobId} failed`, error);
             })
             .finally(() => {
                 this.running.delete(jobId);
+                this.cancelRequested.delete(jobId);
                 this.drain();
             });
     }

@@ -2,13 +2,15 @@ import { ModeBadge, StatusBadge } from '@/components/scan-badges';
 import {
   getScansQueryOptions,
   useDeleteScanMutation,
+  useCancelScanMutation,
+  useRetryScanMutation,
 } from '@/lib/api/scans';
 import { formatDateTime, formatPercentage, cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import type { ScanIssuesSummary, ScanJob } from '@shared/types';
-import { Search, Filter, ArrowUpDown, Trash2, Eye, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, Trash2, Eye, ChevronLeft, ChevronRight, Loader2, XCircle, RotateCw } from 'lucide-react';
 
 type HistorySearch = {
   q?: string;
@@ -76,6 +78,8 @@ function HistoryRoute() {
 
   const scansQuery = useQuery(getScansQueryOptions(queryParams));
   const deleteMutation = useDeleteScanMutation();
+  const cancelMutation = useCancelScanMutation();
+  const retryMutation = useRetryScanMutation();
 
   const totalPages = useMemo(() => {
     const total = scansQuery.data?.pagination.total ?? 0;
@@ -175,7 +179,7 @@ function HistoryRoute() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <div className="hidden border-b border-border bg-muted/40 px-6 py-3 text-xs font-medium uppercase text-muted-foreground md:grid md:grid-cols-[2fr_1fr_1fr_1fr_100px]">
+        <div className="hidden border-b border-border bg-muted/40 px-4 py-3 text-xs font-medium uppercase text-muted-foreground md:grid md:grid-cols-[2fr_1fr_1fr_1fr_140px] md:px-6">
           <span>任务信息</span>
           <span>状态 / 模式</span>
           <span>进度 / 耗时</span>
@@ -200,22 +204,31 @@ function HistoryRoute() {
           {jobs.map((job) => (
             <article
               key={job.id}
-              className="group grid gap-4 px-6 py-4 text-sm transition-colors hover:bg-muted/30 md:grid-cols-[2fr_1fr_1fr_1fr_100px]"
+              className="group flex flex-col gap-3 px-4 py-4 text-sm transition-colors hover:bg-muted/30 md:grid md:grid-cols-[2fr_1fr_1fr_1fr_140px] md:gap-4 md:px-6"
             >
               <div className="flex flex-col justify-center gap-1">
                 <Link
                   to="/history/$scanId"
                   params={{ scanId: job.id.toString() }}
-                  className="font-semibold text-foreground hover:text-indigo-600 hover:underline"
+                  className="font-semibold text-foreground hover:text-indigo-600 hover:underline break-all"
                 >
                   {job.targetUrl}
                 </Link>
+                <div className="flex flex-wrap items-center gap-2 md:hidden">
+                  <StatusBadge status={job.status} />
+                  <ModeBadge mode={job.mode} />
+                </div>
                 <p className="text-xs text-muted-foreground">
                   创建于 {formatDateTime(job.createdAt)}
                 </p>
+                {job.error && (
+                  <p className="text-xs text-rose-600 font-medium line-clamp-2">
+                    错误: {job.error}
+                  </p>
+                )}
               </div>
 
-              <div className="flex flex-col justify-center gap-2">
+              <div className="hidden md:flex flex-col justify-center gap-2">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={job.status} />
                 </div>
@@ -224,11 +237,12 @@ function HistoryRoute() {
                 </div>
               </div>
 
-              <div className="flex flex-col justify-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between md:flex-col md:justify-center md:items-start gap-1 text-xs text-muted-foreground">
+                <span className="md:hidden font-medium text-foreground/70">进度:</span>
                 <p className="font-medium text-foreground">
                   {job.pagesFinished} / {job.pagesTotal ?? '-'} 页
                 </p>
-                <p>
+                <p className="hidden md:block">
                   {job.startedAt && job.completedAt
                     ? `${formatDateTime(job.startedAt).split(' ')[1]} - ${formatDateTime(job.completedAt).split(' ')[1]}`
                     : '未完成'}
@@ -239,23 +253,61 @@ function HistoryRoute() {
                 <SummaryMetrics summary={job.issuesSummary} />
               </div>
 
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-1 pt-2 border-t border-border md:border-0 md:pt-0">
                 <Link
                   to="/history/$scanId"
                   params={{ scanId: job.id.toString() }}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                  className="flex items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-indigo-50 hover:text-indigo-600 md:p-2"
                   title="查看详情"
                 >
                   <Eye className="h-4 w-4" />
+                  <span className="md:hidden">详情</span>
                 </Link>
+                {(job.status === 'running' || job.status === 'pending') && (
+                  <button
+                    type="button"
+                    disabled={cancelMutation.isPending}
+                    onClick={() => cancelMutation.mutate(job.id)}
+                    className="flex items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-50 md:p-2"
+                    title="取消任务"
+                  >
+                    {cancelMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    <span className="md:hidden">取消</span>
+                  </button>
+                )}
+                {job.status === 'failed' && (
+                  <button
+                    type="button"
+                    disabled={retryMutation.isPending}
+                    onClick={() => retryMutation.mutate(job.id)}
+                    className="flex items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 md:p-2"
+                    title="重试任务"
+                  >
+                    {retryMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCw className="h-4 w-4" />
+                    )}
+                    <span className="md:hidden">重试</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  disabled={job.status === 'running' || job.status === 'pending'}
+                  disabled={job.status === 'running' || job.status === 'pending' || deleteMutation.isPending}
                   onClick={() => deleteMutation.mutate(job.id)}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="flex items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 md:p-2"
                   title="删除记录"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  <span className="md:hidden">删除</span>
                 </button>
               </div>
             </article>

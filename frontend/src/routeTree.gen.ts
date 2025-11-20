@@ -11,12 +11,19 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TasksImport } from './routes/tasks'
 import { Route as IndexImport } from './routes/index'
 import { Route as HistoryIndexImport } from './routes/history/index'
 import { Route as HistoryScanIdIndexImport } from './routes/history/$scanId/index'
 import { Route as HistoryScanIdPagesPageIdImport } from './routes/history/$scanId/pages/$pageId'
 
 // Create/Update Routes
+
+const TasksRoute = TasksImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -53,6 +60,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksImport
+      parentRoute: typeof rootRoute
+    }
     '/history/': {
       id: '/history/'
       path: '/history'
@@ -81,6 +95,7 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/tasks': typeof TasksRoute
   '/history': typeof HistoryIndexRoute
   '/history/$scanId': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
@@ -88,6 +103,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/tasks': typeof TasksRoute
   '/history': typeof HistoryIndexRoute
   '/history/$scanId': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
@@ -96,6 +112,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/tasks': typeof TasksRoute
   '/history/': typeof HistoryIndexRoute
   '/history/$scanId/': typeof HistoryScanIdIndexRoute
   '/history/$scanId/pages/$pageId': typeof HistoryScanIdPagesPageIdRoute
@@ -105,14 +122,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/tasks'
     | '/history'
     | '/history/$scanId'
     | '/history/$scanId/pages/$pageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/history' | '/history/$scanId' | '/history/$scanId/pages/$pageId'
+  to:
+    | '/'
+    | '/tasks'
+    | '/history'
+    | '/history/$scanId'
+    | '/history/$scanId/pages/$pageId'
   id:
     | '__root__'
     | '/'
+    | '/tasks'
     | '/history/'
     | '/history/$scanId/'
     | '/history/$scanId/pages/$pageId'
@@ -121,6 +145,7 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TasksRoute: typeof TasksRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   HistoryScanIdIndexRoute: typeof HistoryScanIdIndexRoute
   HistoryScanIdPagesPageIdRoute: typeof HistoryScanIdPagesPageIdRoute
@@ -128,6 +153,7 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TasksRoute: TasksRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   HistoryScanIdIndexRoute: HistoryScanIdIndexRoute,
   HistoryScanIdPagesPageIdRoute: HistoryScanIdPagesPageIdRoute,
@@ -144,6 +170,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/tasks",
         "/history/",
         "/history/$scanId/",
         "/history/$scanId/pages/$pageId"
@@ -151,6 +178,9 @@ export const routeTree = rootRoute
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/tasks": {
+      "filePath": "tasks.tsx"
     },
     "/history/": {
       "filePath": "history/index.tsx"

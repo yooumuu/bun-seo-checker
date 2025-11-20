@@ -6,6 +6,7 @@ import {
     Menu,
     X,
     ScanLine,
+    ListTodo,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ export function DashboardLayout() {
 
     const navigation = [
         { name: '概览', href: '/', icon: LayoutDashboard },
+        { name: '任务管理', href: '/tasks', icon: ListTodo },
         { name: '历史记录', href: '/history', icon: History },
         // { name: '设置', href: '/settings', icon: Settings },
     ];

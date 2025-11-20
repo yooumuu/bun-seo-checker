@@ -5,8 +5,16 @@ import { aggregateSummaries } from "../analyzers/html";
 import { scanSinglePage, type SingleScanResult } from "../analyzers/single";
 import { scanSite } from "../analyzers/site";
 import { recordTaskEvent } from "./events";
+import type { ScanScheduler } from "./scheduler";
 
-export async function runScanJob(jobId: number) {
+export class JobCancelledError extends Error {
+    constructor(jobId: number) {
+        super(`Job ${jobId} was cancelled`);
+        this.name = "JobCancelledError";
+    }
+}
+
+export async function runScanJob(jobId: number, scheduler: ScanScheduler) {
     const job = await db
         .select()
         .from(scanJobs)
@@ -40,6 +48,11 @@ export async function runScanJob(jobId: number) {
         let processedPages = 0;
 
         const emitPageEvent = async (page: SingleScanResult) => {
+            // Check for cancellation before processing each page
+            if (scheduler.isCancelRequested(jobId)) {
+                throw new JobCancelledError(jobId);
+            }
+
             processedPages += 1;
             await recordTaskEvent(jobId, "page_completed", {
                 pageId: page.pageId,
@@ -80,18 +93,25 @@ export async function runScanJob(jobId: number) {
             status: "completed",
         });
     } catch (error) {
+        const isCancelled = error instanceof JobCancelledError;
+        const status = isCancelled ? "failed" : "failed";
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
         await db
             .update(scanJobs)
             .set({
-                status: "failed",
-                error: error instanceof Error ? error.message : "Unknown error",
+                status,
+                error: isCancelled ? "Job was cancelled by user" : errorMessage,
                 completedAt: new Date(),
             })
             .where(eq(scanJobs.id, jobId));
 
-        await recordTaskEvent(jobId, "failed", {
-            error: error instanceof Error ? error.message : "Unknown error",
+        await recordTaskEvent(jobId, isCancelled ? "cancelled" : "failed", {
+            error: isCancelled ? "Job was cancelled by user" : errorMessage,
         });
-        throw error;
+
+        if (!isCancelled) {
+            throw error;
+        }
     }
 }
