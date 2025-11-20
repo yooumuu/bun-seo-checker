@@ -27,7 +27,208 @@ import {
   Zap,
 } from 'lucide-react';
 import type { ScanPageWithMetrics } from '@shared/types';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { ElementFilter, type FilterableElement } from '@/components/element-filter';
+
+// 辅助函数：从完整选择器中提取根选择器（智能识别有意义的区域）
+function getRootSelector(selector: string): string {
+  if (!selector) return '';
+
+  const parts = selector.split(' > ').filter(Boolean);
+  if (parts.length === 0) return selector;
+
+  // 语义化标签列表（这些标签通常代表页面区域）
+  const semanticTags = ['header', 'footer', 'nav', 'aside', 'main', 'article', 'section'];
+
+  // 有意义的类名关键词
+  const meaningfulClassKeywords = [
+    'header', 'footer', 'nav', 'navigation', 'menu', 'sidebar',
+    'aside', 'main', 'content', 'article', 'hero', 'banner',
+    'container', 'wrapper', 'layout', 'page', 'section'
+  ];
+
+  // 策略1：找到第一个语义化标签
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].replace(/:\w+.*$/, ''); // 移除伪类
+    const tagName = part.split('.')[0].split('#')[0].toLowerCase();
+
+    if (semanticTags.includes(tagName)) {
+      // 返回语义化标签及其类名（如果有）
+      return part;
+    }
+  }
+
+  // 策略2：找到第一个有意义的类名
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].replace(/:\w+.*$/, '');
+    const classes = part.match(/\.([a-zA-Z0-9_-]+)/g);
+
+    if (classes) {
+      for (const cls of classes) {
+        const className = cls.substring(1).toLowerCase();
+        for (const keyword of meaningfulClassKeywords) {
+          if (className.includes(keyword)) {
+            // 返回标签+有意义的类名
+            return part;
+          }
+        }
+      }
+    }
+  }
+
+  // 策略3：如果都是通用标签（div/span），按类名特征分组
+  // 尝试找到第一个带有特定前缀的类名（框架生成的）
+  for (let i = 0; i < Math.min(3, parts.length); i++) {
+    const part = parts[i].replace(/:\w+.*$/, '');
+    const classes = part.match(/\.([a-zA-Z0-9_-]+)/g);
+
+    if (classes && classes.length > 0) {
+      // 返回第一个带类名的元素
+      return part;
+    }
+  }
+
+  // 策略4：实在找不到，返回前两层
+  const fallback = parts.slice(0, Math.min(2, parts.length))
+    .map(part => part.replace(/:\w+.*$/, ''))
+    .join(' > ');
+
+  return fallback;
+}
+
+// 辅助函数：根据选择器生成友好的标签
+function getSelectorLabel(selector: string): string {
+  const cleanSelector = selector.replace(/:\w+.*$/, '');
+
+  // 提取标签名和类名
+  const tagMatch = cleanSelector.match(/^([a-zA-Z0-9]+)/);
+  const tagName = tagMatch ? tagMatch[1].toLowerCase() : '';
+
+  // 提取第一个类名
+  const classMatch = cleanSelector.match(/\.([a-zA-Z0-9_-]+)/);
+  const className = classMatch ? classMatch[1] : '';
+
+  // 标签名映射
+  const tagLabelMap: Record<string, string> = {
+    'header': '页头',
+    'footer': '页脚',
+    'nav': '导航',
+    'aside': '侧边栏',
+    'main': '主内容',
+    'article': '文章',
+    'section': '区块',
+  };
+
+  // 类名关键词映射
+  const classKeywordMap: Record<string, string> = {
+    'header': '页头',
+    'footer': '页脚',
+    'nav': '导航',
+    'navigation': '导航',
+    'menu': '菜单',
+    'sidebar': '侧边栏',
+    'aside': '侧边栏',
+    'main': '主内容',
+    'content': '内容',
+    'article': '文章',
+    'hero': '横幅',
+    'banner': '顶部横幅',
+    'container': '容器',
+    'wrapper': '包装器',
+    'layout': '布局',
+  };
+
+  // 优先级1：语义化标签
+  if (tagLabelMap[tagName]) {
+    if (className) {
+      // 如果有类名，组合显示
+      const friendlyClass = formatClassName(className);
+      return `${tagLabelMap[tagName]} (${friendlyClass})`;
+    }
+    return tagLabelMap[tagName];
+  }
+
+  // 优先级2：有意义的类名
+  if (className) {
+    const lowerClass = className.toLowerCase();
+    for (const [keyword, label] of Object.entries(classKeywordMap)) {
+      if (lowerClass.includes(keyword)) {
+        return `${label} (${formatClassName(className)})`;
+      }
+    }
+
+    // 返回格式化的类名
+    return formatClassName(className);
+  }
+
+  // 优先级3：通用标签名
+  if (tagName) {
+    return `<${tagName}>`;
+  }
+
+  // 最后返回原始选择器
+  return cleanSelector;
+}
+
+// 格式化类名为可读文本
+function formatClassName(className: string): string {
+  // 处理常见的框架类名模式
+  // 例如：framer-6v6ez -> Framer 组件
+  if (className.match(/^[a-z]+-[a-z0-9]{5,}$/i)) {
+    const parts = className.split('-');
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + ' 组件';
+  }
+
+  // 处理 BEM 命名
+  if (className.includes('__')) {
+    const [block, element] = className.split('__');
+    return `${block} 的 ${element}`;
+  }
+
+  // 处理中划线命名
+  if (className.includes('-')) {
+    return className
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  // 处理驼峰命名
+  if (className.match(/[a-z][A-Z]/)) {
+    return className
+      .replace(/([A-Z])/g, ' $1')
+      .trim()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  // 直接返回，首字母大写
+  return className.charAt(0).toUpperCase() + className.slice(1);
+}
+
+// 辅助函数：根据选择器确定分类
+function getSelectorCategory(selector: string): 'layout' | 'content' | 'navigation' {
+  const lower = selector.toLowerCase();
+
+  // 导航相关
+  if (lower.includes('nav') || lower.includes('menu') || lower.includes('breadcrumb')) {
+    return 'navigation';
+  }
+
+  // 布局相关
+  if (lower.includes('header') || lower.includes('footer') || lower.includes('sidebar') || lower.includes('aside')) {
+    return 'layout';
+  }
+
+  // 内容相关
+  if (lower.includes('main') || lower.includes('article') || lower.includes('content') || lower.includes('section')) {
+    return 'content';
+  }
+
+  // 默认分类为内容
+  return 'content';
+}
 
 export const Route = createFileRoute('/history/$scanId/pages/$pageId')({
   component: PageDetailRoute,
@@ -50,11 +251,103 @@ function PageDetailRoute() {
     htmlStructure: true,
     utmLinks: true,
     trackingEvents: true,
+    elementFilter: false,
   });
 
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
+
+  // 元素过滤状态
+  const [hiddenSelectors, setHiddenSelectors] = useState<Set<string>>(new Set());
+
+  // 从页面数据中提取可过滤的元素
+  const filterableElements = useMemo((): FilterableElement[] => {
+    if (!page) return [];
+
+    const elements: FilterableElement[] = [];
+    const selectorCounts = new Map<string, number>();
+
+    // 统计 UTM 链接中的选择器
+    page.links?.utmSummary?.examples?.forEach(link => {
+      if (link.selector) {
+        const rootSelector = getRootSelector(link.selector);
+        selectorCounts.set(rootSelector, (selectorCounts.get(rootSelector) || 0) + 1);
+      }
+    });
+
+    // 统计追踪事件中的选择器
+    page.trackingEvents?.forEach(event => {
+      // 从链接位置提取选择器（通过关联）
+      const linkedExample = page.links?.utmSummary?.examples?.find(ex =>
+        ex.triggeredEvents?.some(te => te.eventName === event.eventName)
+      );
+      if (linkedExample?.selector) {
+        const rootSelector = getRootSelector(linkedExample.selector);
+        selectorCounts.set(rootSelector, (selectorCounts.get(rootSelector) || 0) + 1);
+      }
+    });
+
+    // 转换为可过滤元素列表
+    selectorCounts.forEach((count, selector) => {
+      elements.push({
+        selector,
+        label: getSelectorLabel(selector),
+        category: getSelectorCategory(selector),
+        count,
+      });
+    });
+
+    return elements.sort((a, b) => b.count - a.count);
+  }, [page]);
+
+  // 过滤后的 UTM 链接
+  const filteredUtmLinks = useMemo(() => {
+    if (!page?.links?.utmSummary?.examples || hiddenSelectors.size === 0) {
+      return page?.links?.utmSummary;
+    }
+
+    const filtered = page.links.utmSummary.examples.filter(link => {
+      if (!link.selector) return true;
+      const rootSelector = getRootSelector(link.selector);
+      return !hiddenSelectors.has(rootSelector);
+    });
+
+    return {
+      ...page.links.utmSummary,
+      examples: filtered,
+      trackedLinks: filtered.filter(l => l.params.length > 0).length,
+      missingUtm: filtered.filter(l => l.params.length === 0).length,
+    };
+  }, [page, hiddenSelectors]);
+
+  // 过滤后的追踪事件
+  const filteredTrackingEvents = useMemo(() => {
+    if (!page?.trackingEvents || hiddenSelectors.size === 0) {
+      return page?.trackingEvents || [];
+    }
+
+    return page.trackingEvents.filter(event => {
+      // 查找关联的链接
+      const linkedExample = page.links?.utmSummary?.examples?.find(ex =>
+        ex.triggeredEvents?.some(te => te.eventName === event.eventName)
+      );
+
+      if (!linkedExample?.selector) return true;
+
+      const rootSelector = getRootSelector(linkedExample.selector);
+      return !hiddenSelectors.has(rootSelector);
+    });
+  }, [page, hiddenSelectors]);
+
+  // 过滤后的链接用于传递给 TrackingEventsTable
+  const filteredLinks = useMemo((): ScanPageWithMetrics['links'] | undefined => {
+    if (!page?.links) return undefined;
+    return {
+      ...page.links,
+      utmSummary: filteredUtmLinks || null,
+    };
+  }, [page, filteredUtmLinks]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6">
@@ -337,7 +630,7 @@ function PageDetailRoute() {
           {page.seo?.htmlStructureIssues && (
             <CollapsibleSection
               title="HTML 结构审计"
-              icon={<FileCode className="h-4 w-4 text-purple-500" />}
+              icon={<FileCode className="h-4 w-4 text-slate-400" />}
               isOpen={openSections.htmlStructure}
               onToggle={() => toggleSection('htmlStructure')}
             >
@@ -565,40 +858,54 @@ function PageDetailRoute() {
             </CollapsibleSection>
           )}
 
+          {/* Element Filter */}
+          {filterableElements.length > 0 && (
+            <ElementFilter
+              elements={filterableElements}
+              onFilterChange={setHiddenSelectors}
+            />
+          )}
+
           {/* UTM Link Table */}
           <CollapsibleSection
             title="UTM 链接清单"
             icon={<Link2 className="h-4 w-4 text-slate-400" />}
             isOpen={openSections.utmLinks}
             onToggle={() => toggleSection('utmLinks')}
+            badge={
+              hiddenSelectors.size > 0 && (
+                <span className="text-xs text-slate-500">
+                  (已过滤 {(page.links?.utmSummary?.examples?.length || 0) - (filteredUtmLinks?.examples?.length || 0)} 个)
+                </span>
+              )
+            }
           >
-            <UtmLinkTable summary={page.links?.utmSummary} />
+            <UtmLinkTable summary={filteredUtmLinks} />
           </CollapsibleSection>
 
-          {/* Tracking Events - Direct Render without CollapsibleSection */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-6 py-4 bg-gradient-to-r from-slate-50 to-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
-                    <Activity className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-slate-900">埋点事件清单</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      检测到的所有埋点事件和触发情况
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
-                  {page?.trackingEvents?.length ?? 0}
+          {/* Tracking Events */}
+          <CollapsibleSection
+            title="埋点事件清单"
+            icon={<Activity className="h-4 w-4 text-slate-400" />}
+            isOpen={openSections.trackingEvents}
+            onToggle={() => toggleSection('trackingEvents')}
+            badge={
+              <>
+                {hiddenSelectors.size > 0 && (
+                  <span className="text-xs text-slate-500">
+                    (已过滤 {(page?.trackingEvents?.length || 0) - filteredTrackingEvents.length} 个)
+                  </span>
+                )}
+                <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ml-2">
+                  {filteredTrackingEvents.length}
                 </span>
-              </div>
-            </div>
+              </>
+            }
+          >
             <div className="p-6">
-              <TrackingEventsTable events={page?.trackingEvents} links={page?.links} />
+              <TrackingEventsTable events={filteredTrackingEvents} links={filteredLinks} />
             </div>
-          </section>
+          </CollapsibleSection>
         </div>
       ) : pageQuery.isPending ? (
         <div className="flex h-64 items-center justify-center text-sm text-slate-500">
@@ -852,16 +1159,6 @@ const UtmLinkTable = ({
       </div>
     </div>
   );
-};
-
-const tryFormatJson = (str?: string | null) => {
-  if (!str) return '';
-  try {
-    const parsed = JSON.parse(str);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    return str;
-  }
 };
 
 const calculateCoverage = (utmSummary?: UtmSummary | null) => {
