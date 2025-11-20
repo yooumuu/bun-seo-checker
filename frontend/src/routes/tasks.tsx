@@ -373,7 +373,10 @@ function TaskCard({
           <div className="flex items-center gap-2">
             <ModeBadge mode={job.mode} />
             <span className="text-xs text-muted-foreground">
-              {job.pagesFinished ?? 0} / {job.pagesTotal ?? '-'} 页
+              {job.mode === 'single'
+                ? `步骤 ${job.pagesFinished ?? 0} / ${job.pagesTotal ?? 6}`
+                : `${job.pagesFinished ?? 0} / ${job.pagesTotal ?? '-'} 页`
+              }
             </span>
           </div>
 

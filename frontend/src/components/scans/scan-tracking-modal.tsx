@@ -5,7 +5,6 @@ import { getScanByIdQueryOptions, useLiveScanEvents } from '@/lib/api/scans';
 import { StatusBadge, ModeBadge } from '@/components/scan-badges';
 import { formatDateTime } from '@/lib/utils';
 import { X, CheckCircle2, AlertCircle, Loader2, ChevronRight, ExternalLink } from 'lucide-react';
-import type { ScanJob } from '@shared/types';
 
 type ScanTrackingModalProps = {
   scanId: number;
@@ -141,9 +140,14 @@ export function ScanTrackingModal({ scanId, isOpen, onClose }: ScanTrackingModal
                 {(scan.status === 'running' || scan.status === 'pending') && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">扫描进度</span>
+                      <span className="text-muted-foreground">
+                        {scan.mode === 'single' ? '分析进度' : '扫描进度'}
+                      </span>
                       <span className="font-medium text-foreground">
-                        {scan.pagesFinished ?? 0} / {scan.pagesTotal ?? '...'} 页
+                        {scan.mode === 'single'
+                          ? `步骤 ${scan.pagesFinished ?? 0} / ${scan.pagesTotal ?? 6}`
+                          : `${scan.pagesFinished ?? 0} / ${scan.pagesTotal ?? '...'} 页`
+                        }
                       </span>
                     </div>
                     <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">

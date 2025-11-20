@@ -76,7 +76,8 @@ export type SingleScanResult = {
 
 export const scanSinglePage = async (
     job: ScanJobRecord,
-    pageUrl = job.targetUrl
+    pageUrl = job.targetUrl,
+    onProgress?: (step: number, total: number, message: string) => void | Promise<void>
 ): Promise<SingleScanResult> => {
     return db.transaction(async (tx) => {
         const [page] = await tx
@@ -93,6 +94,8 @@ export const scanSinglePage = async (
         }
 
         try {
+            const totalSteps = 6; // Fetch, SEO, Links, Tracking, JSON-LD, HTML Structure
+            let currentStep = 0;
 
             let html = "";
             let status = 0;
@@ -102,6 +105,8 @@ export const scanSinglePage = async (
             let tracking: ReturnType<typeof analyzeTracking>;
 
             if (env.SCANNER_USE_BROWSER) {
+                if (onProgress) await onProgress(++currentStep, totalSteps, "正在加载页面...");
+
                 const profiles = env.SCANNER_DEVICE_PROFILES.split(",") as DeviceProfile[];
                 const primaryProfile = profiles[0] || "desktop";
 
@@ -140,8 +145,10 @@ export const scanSinglePage = async (
 
                 if (!primaryResult) throw new Error("Primary scan failed");
 
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析SEO元素...");
                 seo = analyzeSeo(html);
 
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析链接和UTM...");
                 let trackedCount = 0;
                 let missingCount = 0;
                 let internalCount = 0;
@@ -208,6 +215,14 @@ export const scanSinglePage = async (
                     }
                 }
 
+                // Check link health for browser mode
+                const { analyzeLinksAsync } = await import("./html.js");
+                const linksWithHealth = await analyzeLinksAsync(html, pageUrl, {
+                    checkLinkHealth: true,
+                    maxLinksToCheck: 30,  // Increased from 20
+                    sampleInternal: false, // Check all links for accurate detection
+                });
+
                 links = {
                     internalLinks: internalCount,
                     externalLinks: externalCount,
@@ -216,11 +231,12 @@ export const scanSinglePage = async (
                         missingUtm: missingCount,
                         examples,
                     },
-                    brokenLinks: 0,
-                    redirects: 0,
+                    brokenLinks: linksWithHealth.brokenLinks,
+                    redirects: linksWithHealth.redirects,
                     discoveredInternalUrls: Array.from(discoveredInternal),
                 };
 
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析埋点事件...");
                 tracking = allTracking.map((e) => ({
                     element: "script",
                     trigger: e.type,
@@ -231,6 +247,7 @@ export const scanSinglePage = async (
                     payload: e.payload,
                 }));
             } else {
+                if (onProgress) await onProgress(++currentStep, totalSteps, "正在加载页面...");
                 const fetchResult = await fetchPage(pageUrl, {
                     userAgent: job.options?.userAgent,
                     timeoutMs: job.options?.requestTimeoutMs,
@@ -239,16 +256,29 @@ export const scanSinglePage = async (
                 status = fetchResult.status;
                 loadTimeMs = fetchResult.loadTimeMs;
 
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析SEO元素...");
                 seo = analyzeSeo(html);
-                links = analyzeLinks(html, pageUrl);
+
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析链接和UTM...");
+                // Use async version to check link health
+                const { analyzeLinksAsync } = await import("./html.js");
+                links = await analyzeLinksAsync(html, pageUrl, {
+                    checkLinkHealth: true,
+                    maxLinksToCheck: 30,  // Increased from 20
+                    sampleInternal: false, // Check all links for accurate detection
+                });
+
+                if (onProgress) await onProgress(++currentStep, totalSteps, "分析埋点事件...");
                 tracking = analyzeTracking(html);
             }
 
+            if (onProgress) await onProgress(++currentStep, totalSteps, "分析JSON-LD结构化数据...");
             // 分析 JSON-LD 结构化数据
             const { analyzeJsonLd } = await import("./jsonld.js");
             const jsonLdAnalysis = analyzeJsonLd(html);
             seo.jsonLdAnalysis = jsonLdAnalysis;
 
+            if (onProgress) await onProgress(++currentStep, totalSteps, "分析HTML结构...");
             // 分析 HTML 结构
             const { analyzeHtmlStructure } = await import("./htmlStructure.js");
             const htmlStructureAnalysis = analyzeHtmlStructure(html);

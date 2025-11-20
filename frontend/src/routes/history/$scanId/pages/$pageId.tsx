@@ -283,11 +283,26 @@ function PageDetailRoute() {
                     <span>{page.links?.utmSummary?.missingUtm ?? 0} 未标记</span>
                   </div>
                 </div>
-                <Field
-                  label="跳转 / 异常"
-                  value={`${page.links?.redirects ?? 0} / ${page.links?.brokenLinks ?? 0}`}
-                  highlight={page.links?.brokenLinks ? 'text-rose-600' : undefined}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">总链接数</span>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {(page.links?.internalLinks ?? 0) + (page.links?.externalLinks ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">重定向链接</span>
+                    <span className={`text-sm font-semibold ${page.links?.redirects ? 'text-amber-600' : 'text-slate-900'}`}>
+                      {page.links?.redirects ?? 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">异常链接</span>
+                    <span className={`text-sm font-semibold ${page.links?.brokenLinks ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {page.links?.brokenLinks ?? 0}
+                    </span>
+                  </div>
+                </div>
               </dl>
             </Card>
 

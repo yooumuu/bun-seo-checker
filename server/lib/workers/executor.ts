@@ -5,6 +5,7 @@ import { aggregateSummaries } from "../analyzers/html";
 import { scanSinglePage, type SingleScanResult } from "../analyzers/single";
 import { scanSite } from "../analyzers/site";
 import { recordTaskEvent } from "./events";
+import { env } from "../config";
 import type { ScanScheduler } from "./scheduler";
 
 export class JobCancelledError extends Error {
@@ -54,6 +55,15 @@ export async function runScanJob(jobId: number, scheduler: ScanScheduler) {
             }
 
             processedPages += 1;
+
+            // Update progress in database for real-time tracking
+            await db
+                .update(scanJobs)
+                .set({
+                    pagesFinished: processedPages,
+                })
+                .where(eq(scanJobs.id, jobId));
+
             await recordTaskEvent(jobId, "page_completed", {
                 pageId: page.pageId,
                 url: page.url,
@@ -64,15 +74,54 @@ export async function runScanJob(jobId: number, scheduler: ScanScheduler) {
         };
 
         if (job.mode === "site") {
+            // Set initial pagesTotal estimate for site scans
+            const maxPages = job.options?.maxPages ?? env.SCANNER_MAX_PAGES;
+            await db
+                .update(scanJobs)
+                .set({
+                    pagesTotal: maxPages,
+                })
+                .where(eq(scanJobs.id, jobId));
+
             const result = await scanSite(job, emitPageEvent);
             pagesTotal = result.pagesTotal;
             pagesFinished = result.pagesFinished;
             summaryPayload = result.issueSummary;
         } else {
-            const result = await scanSinglePage(job);
-            await emitPageEvent(result);
-            pagesTotal = result.pagesTotal;
-            pagesFinished = result.pagesFinished;
+            // For single page scans, use totalSteps as pagesTotal for progress tracking
+            const totalSteps = 6;
+            await db
+                .update(scanJobs)
+                .set({
+                    pagesTotal: totalSteps,
+                    pagesFinished: 0,
+                })
+                .where(eq(scanJobs.id, jobId));
+
+            const onSinglePageProgress = async (step: number, total: number, message: string) => {
+                // Check for cancellation
+                if (scheduler.isCancelRequested(jobId)) {
+                    throw new JobCancelledError(jobId);
+                }
+
+                // Update progress in database
+                await db
+                    .update(scanJobs)
+                    .set({
+                        pagesFinished: step,
+                    })
+                    .where(eq(scanJobs.id, jobId));
+
+                // Emit progress event
+                await recordTaskEvent(jobId, "page_completed", {
+                    pagesFinished: step,
+                    message,
+                });
+            };
+
+            const result = await scanSinglePage(job, job.targetUrl, onSinglePageProgress);
+            pagesTotal = 1;
+            pagesFinished = 1;
             summaryPayload = aggregateSummaries([result.issueSummary]);
         }
 

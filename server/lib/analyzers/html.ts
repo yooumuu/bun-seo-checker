@@ -69,6 +69,11 @@ export type LinkAnalysis = {
     discoveredInternalUrls: string[];
 };
 
+export type LinkWithUrl = {
+    url: string;
+    isInternal: boolean;
+};
+
 export type TrackingEventAnalysis = {
     element: string;
     trigger: string;
@@ -177,6 +182,125 @@ export const analyzeSeo = (html: string): SeoAnalysis => {
         robotsTxtBlocked,
         schemaOrg,
         score: Math.max(score, 0),
+    };
+};
+
+// Helper function to check link status
+const checkLinkStatus = async (url: string): Promise<{ isRedirect: boolean; isBroken: boolean; status: number }> => {
+    try {
+        // Try HEAD first, fall back to GET if HEAD is not supported
+        let response = await fetch(url, {
+            method: 'HEAD',
+            redirect: 'manual', // Don't follow redirects
+            signal: AbortSignal.timeout(5000), // 5 second timeout
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; SEO-Checker/1.0)',
+            }
+        });
+
+        // If HEAD returns 405 (Method Not Allowed) or 400, try GET
+        if (response.status === 405 || response.status === 400) {
+            response = await fetch(url, {
+                method: 'GET',
+                redirect: 'manual',
+                signal: AbortSignal.timeout(5000),
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; SEO-Checker/1.0)',
+                }
+            });
+        }
+
+        const isRedirect = response.status >= 300 && response.status < 400;
+        const isBroken = response.status >= 400;
+
+        return { isRedirect, isBroken, status: response.status };
+    } catch (error) {
+        // If fetch fails (network error, timeout), consider it broken
+        return { isRedirect: false, isBroken: true, status: 0 };
+    }
+};
+
+// Async version that checks link statuses
+export const analyzeLinksAsync = async (
+    html: string,
+    baseUrl: string,
+    options?: {
+        checkLinkHealth?: boolean;
+        maxLinksToCheck?: number;
+        sampleInternal?: boolean;
+    }
+): Promise<LinkAnalysis> => {
+    // First run the synchronous analysis
+    const basicAnalysis = analyzeLinks(html, baseUrl);
+
+    // If link health check is not enabled, return basic analysis
+    if (!options?.checkLinkHealth) {
+        return basicAnalysis;
+    }
+
+    // Extract ALL internal links from HTML for checking
+    const internalLinksToCheck = new Set<string>();
+    const base = new URL(baseUrl);
+
+    // Parse all anchor tags from HTML
+    let match: RegExpExecArray | null;
+    const anchorRegex = /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi;
+
+    while ((match = anchorRegex.exec(html))) {
+        const href = decodeHtmlEntities(match[1] ?? match[2] ?? "");
+        if (!href) continue;
+
+        try {
+            const normalized = new URL(href, base).toString();
+            const linkUrl = new URL(normalized);
+
+            // Only check internal links
+            if (linkUrl.hostname === base.hostname) {
+                internalLinksToCheck.add(normalized);
+                if (internalLinksToCheck.size >= (options.maxLinksToCheck ?? 50)) {
+                    break;
+                }
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    // If sampling is enabled, only check a subset
+    const linksArray = Array.from(internalLinksToCheck);
+    const linksToCheck = options.sampleInternal && linksArray.length > 10
+        ? linksArray.slice(0, 10)
+        : linksArray;
+
+    // Check link statuses in parallel (with concurrency limit)
+    let redirectCount = 0;
+    let brokenCount = 0;
+
+    const checkPromises = linksToCheck.map(url => checkLinkStatus(url));
+    const results = await Promise.allSettled(checkPromises);
+
+    for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const url = linksToCheck[i];
+
+        if (!result || !url) continue;
+
+        if (result.status === 'fulfilled') {
+            const { isRedirect, isBroken } = result.value;
+
+            if (isRedirect) {
+                redirectCount++;
+            }
+            if (isBroken) {
+                brokenCount++;
+            }
+        }
+    }
+
+    return {
+        ...basicAnalysis,
+        brokenLinks: brokenCount,
+        redirects: redirectCount,
     };
 };
 

@@ -311,6 +311,18 @@ function ScanDetailRoute() {
                       <td className="px-6 py-4 align-top">
                         <div className="space-y-2">
                           <UtmInlineList summary={pageItem.links?.utmSummary} />
+                          <div className="flex flex-wrap gap-2 text-[11px]">
+                            {(pageItem.links?.redirects ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 border border-amber-100">
+                                {pageItem.links.redirects} 重定向
+                              </span>
+                            )}
+                            {(pageItem.links?.brokenLinks ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 border border-rose-100">
+                                {pageItem.links.brokenLinks} 异常
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
                             <LayoutDashboard className="h-3 w-3" />
                             <span>{pageItem.trackingEvents.length} 个埋点事件</span>
