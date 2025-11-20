@@ -25,4 +25,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      external: [
+        'drizzle-orm/pg-core',
+        'drizzle-orm',
+        'drizzle-zod',
+        'postgres',
+        'playwright',
+        'cheerio',
+        'zod',
+        '@hono/zod-validator',
+      ],
+    },
+  },
 });
