@@ -522,7 +522,48 @@ function PageDetailRoute() {
                     label="Description"
                     value={page.seo?.metaDescription}
                   />
-                  <Field label="H1" value={page.seo?.h1} />
+
+                  {/* H1 部分 - 增强显示 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-medium uppercase text-slate-400">H1</p>
+                      {page.seo?.h1Score !== null && page.seo?.h1Score !== undefined ? (
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-semibold ${
+                            page.seo.h1Score >= 80 ? 'text-emerald-600' :
+                            page.seo.h1Score >= 60 ? 'text-amber-600' :
+                            'text-rose-600'
+                          }`}>
+                            {page.seo.h1Score}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-slate-900 break-words">
+                      {page.seo?.h1 !== undefined && page.seo?.h1 !== null && page.seo?.h1 !== ''
+                        ? String(page.seo.h1)
+                        : '--'}
+                    </p>
+
+                    {/* H1 问题列表 */}
+                    {page.seo?.h1Issues && page.seo.h1Issues.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {page.seo.h1Issues.length} 个问题
+                        </summary>
+                        <div className="mt-2 space-y-1">
+                          {page.seo.h1Issues.map((issue: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 border border-amber-200">
+                              <span className="shrink-0">•</span>
+                              <span>{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+
                   <Field label="Canonical" value={page.seo?.canonical} />
                   <div className="grid grid-cols-2 gap-4">
                     <Field

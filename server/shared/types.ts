@@ -78,6 +78,8 @@ export type SeoMetrics = {
   metaDescription: string | null;
   canonical: string | null;
   h1: string | null;
+  h1Score?: number | null; // H1 质量评分 (0-100)
+  h1Issues?: string[] | null; // H1 存在的问题
   robotsTxtBlocked: boolean;
   schemaOrg: Record<string, unknown> | null;
   score: number | null;
