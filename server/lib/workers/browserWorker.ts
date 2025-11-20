@@ -74,6 +74,15 @@ export class BrowserWorker {
         });
 
         const page = await context.newPage();
+
+        // Capture console logs from the browser
+        page.on('console', (msg) => {
+            const text = msg.text();
+            if (text.includes('[Click Test]') || text.includes('[Tracking')) {
+                console.log(`[Browser] ${text}`);
+            }
+        });
+
         const result: BrowserScanResult = {
             deviceVariant: deviceProfile,
             url,
@@ -387,17 +396,48 @@ export class BrowserWorker {
                 });
 
                 // Phase 2: Active Auditing (Click Simulation)
-                // Limit to first 20 visible links to avoid excessive scan time
-                const maxLinksToTest = 20;
+                // Strategy: Re-query links each time to handle dynamic DOM updates
+                const maxLinksToTest = 30;
                 let testedCount = 0;
+                let skippedCount = 0;
 
-                for (let i = 0; i < anchors.length && testedCount < maxLinksToTest; i++) {
-                    const a = anchors[i] as HTMLAnchorElement;
+                console.log(`[Click Test] Starting to test ${results.length} links (max ${maxLinksToTest})`);
 
-                    // Skip if element is no longer in the DOM or not visible
-                    if (!a.isConnected || !isElementVisible(a)) continue;
+                for (let i = 0; i < results.length && testedCount < maxLinksToTest; i++) {
+                    const linkInfo = results[i];
+                    if (!linkInfo) continue;
+
+                    // Re-query the element using selector and href to handle DOM updates
+                    let a: HTMLAnchorElement | null = null;
+
+                    // Try to find element by exact href match
+                    const allAnchors = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+                    a = allAnchors.find(el => el.href === linkInfo.url) || null;
+
+                    if (!a || !a.isConnected) {
+                        skippedCount++;
+                        console.log(`[Click Test] Skipped #${i}: element not found in DOM`);
+                        continue;
+                    }
+
+                    // Scroll element into view to ensure it's visible and handlers are active
+                    try {
+                        a.scrollIntoView({ behavior: 'instant', block: 'center' });
+                        // Wait for any scroll-triggered lazy loading or animations
+                        await new Promise(resolve => setTimeout(resolve, 150));
+                    } catch (e) {
+                        console.warn('Failed to scroll element into view:', e);
+                    }
+
+                    // Re-check visibility after scrolling
+                    if (!isElementVisible(a)) {
+                        skippedCount++;
+                        console.log(`[Click Test] Skipped #${i} (${a.innerText?.substring(0, 20)}...): not visible after scroll`);
+                        continue;
+                    }
 
                     const startLogLength = (window as any).__trackingLog.length;
+                    console.log(`[Click Test] Testing #${i}: "${a.innerText?.substring(0, 30)}..." href=${a.href?.substring(0, 50)}`);
 
                     const preventNav = (e: Event) => {
                         e.preventDefault();
@@ -429,8 +469,9 @@ export class BrowserWorker {
                         a.dispatchEvent(mouseup);
                         a.dispatchEvent(click);
 
-                        // Wait for async tracking handlers (Mixpanel may use setTimeout)
-                        await new Promise(resolve => setTimeout(resolve, 300));
+                        // Wait longer for async tracking handlers
+                        // Mixpanel and GTM may use setTimeout/requestAnimationFrame
+                        await new Promise(resolve => setTimeout(resolve, 400));
                     } catch (e) {
                         console.error('Click simulation error:', e);
                     }
@@ -438,14 +479,19 @@ export class BrowserWorker {
                     a.removeEventListener('click', preventNav);
 
                     const endLogLength = (window as any).__trackingLog.length;
-                    const result = results[i];
-                    if (endLogLength > startLogLength && result) {
-                        result.triggeredEvents = (window as any).__trackingLog.slice(startLogLength);
+                    const eventsTriggered = endLogLength - startLogLength;
+
+                    if (eventsTriggered > 0 && linkInfo) {
+                        linkInfo.triggeredEvents = (window as any).__trackingLog.slice(startLogLength);
+                        console.log(`[Click Test] ✅ #${i} triggered ${eventsTriggered} events`);
+                    } else {
+                        console.log(`[Click Test] ❌ #${i} triggered NO events`);
                     }
 
                     testedCount++;
                 }
 
+                console.log(`[Click Test] Summary: tested=${testedCount}, skipped=${skippedCount}, total=${anchors.length}`);
                 return results;
             });
 
