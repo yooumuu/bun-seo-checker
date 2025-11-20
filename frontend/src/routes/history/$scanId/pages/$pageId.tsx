@@ -22,6 +22,7 @@ import {
   Tablet,
   Terminal,
   Timer,
+  Zap,
 } from 'lucide-react';
 import type { ScanPageWithMetrics } from '@shared/types';
 
@@ -185,6 +186,15 @@ function PageDetailRoute() {
             </Card>
           </div>
 
+          {/* UTM Link Table */}
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-slate-100 px-6 py-4 flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-slate-400" />
+              <h2 className="font-semibold text-slate-900">UTM 链接清单</h2>
+            </div>
+            <UtmLinkTable summary={page.links?.utmSummary} />
+          </section>
+
           {/* Tracking Events */}
           <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
@@ -239,15 +249,6 @@ function PageDetailRoute() {
                 未检测到埋点脚本
               </div>
             )}
-          </section>
-
-          {/* UTM Link Table */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-6 py-4 flex items-center gap-2">
-              <Link2 className="h-4 w-4 text-slate-400" />
-              <h2 className="font-semibold text-slate-900">UTM 链接清单</h2>
-            </div>
-            <UtmLinkTable summary={page.links?.utmSummary} />
           </section>
         </div>
       ) : pageQuery.isPending ? (
@@ -430,6 +431,28 @@ const UtmLinkTable = ({
                             {param}
                           </span>
                         ))}
+                      </div>
+                    )}
+                    {example.triggeredEvents && example.triggeredEvents.length > 0 && (
+                      <div className="mt-2 border-t border-slate-100 pt-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Zap className="h-3.5 w-3.5 text-amber-500" />
+                          {Array.from(new Set(example.triggeredEvents.map(e => e.platform))).map(platform => (
+                            <span
+                              key={platform}
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${platform === 'mixpanel'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : platform === 'dataLayer'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : platform === 'gtag'
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-orange-100 text-orange-700'
+                                }`}
+                            >
+                              {platform}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

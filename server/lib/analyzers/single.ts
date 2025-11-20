@@ -176,6 +176,15 @@ export const scanSinglePage = async (
                             heading: link.heading ? { tag: null, text: link.heading } : null,
                             deviceVariant: link.deviceVariant,
                             selector: link.selector,
+                            triggeredEvents: link.triggeredEvents?.map(e => ({
+                                element: "link",
+                                trigger: e.type,
+                                platform: e.platform,
+                                status: "fired",
+                                eventName: typeof e.payload === 'string' ? e.payload : JSON.stringify(e.payload),
+                                deviceVariant: link.deviceVariant,
+                                payload: e.payload
+                            })) || [],
                         });
                     } else if (isInternal) {
                         missingCount++;
@@ -186,6 +195,15 @@ export const scanSinglePage = async (
                             heading: link.heading ? { tag: null, text: link.heading } : null,
                             deviceVariant: link.deviceVariant,
                             selector: link.selector,
+                            triggeredEvents: link.triggeredEvents?.map(e => ({
+                                element: "link",
+                                trigger: e.type,
+                                platform: e.platform,
+                                status: "fired",
+                                eventName: typeof e.payload === 'string' ? e.payload : JSON.stringify(e.payload),
+                                deviceVariant: link.deviceVariant,
+                                payload: e.payload
+                            })) || [],
                         });
                     }
                 }

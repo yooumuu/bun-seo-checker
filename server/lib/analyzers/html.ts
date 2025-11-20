@@ -58,6 +58,7 @@ export type LinkAnalysis = {
             } | null;
             deviceVariant?: DeviceVariant | null;
             selector?: string | null;
+            triggeredEvents?: TrackingEventAnalysis[];
         }>;
     };
     brokenLinks: number;

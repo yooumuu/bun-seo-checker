@@ -13,6 +13,7 @@ export interface BrowserScanResult {
         heading?: string;
         utmParams: Record<string, string>;
         selector: string;
+        triggeredEvents?: Array<{ type: string; payload: any; platform: string }>;
     }>;
     trackingEvents: Array<{
         platform: string;
@@ -95,38 +96,55 @@ export class BrowserWorker {
 
                 // Hook Mixpanel
                 const wrap = (obj: any, method: string, platform: string) => {
-                    const original = obj?.[method];
-                    if (!original) return;
-                    obj[method] = (...args: any[]) => {
+                    if (!obj || !obj[method] || obj[method].__hooked) return;
+                    const original = obj[method];
+                    obj[method] = function (...args: any[]) {
                         pushEvent(platform, method, args);
-                        try { return original.apply(obj, args); } catch (err) { throw err; }
+                        try { return original.apply(this, args); } catch (err) { throw err; }
                     };
+                    obj[method].__hooked = true;
                 };
 
-                // We need to wait for mixpanel to be available or hook the window property
-                let mixpanel = (window as any).mixpanel;
-                if (mixpanel) {
-                    wrap(mixpanel, 'track', 'mixpanel');
-                } else {
+                const hookMixpanel = () => {
+                    try {
+                        const mp = (window as any).mixpanel;
+                        if (mp) {
+                            if (typeof mp.track === 'function') wrap(mp, 'track', 'mixpanel');
+                            if (Array.isArray(mp)) wrap(mp, 'push', 'mixpanel');
+                        }
+                    } catch (e) { }
+                };
+
+                // 1. Try immediate hook
+                hookMixpanel();
+
+                // 2. Hook property definition
+                let _mixpanel = (window as any).mixpanel;
+                try {
                     Object.defineProperty(window, 'mixpanel', {
                         configurable: true,
                         enumerable: true,
-                        get() { return this._mixpanel; },
+                        get() { return _mixpanel; },
                         set(val) {
-                            this._mixpanel = val;
-                            if (val) wrap(val, 'track', 'mixpanel');
+                            _mixpanel = val;
+                            hookMixpanel();
                         }
                     });
+                } catch (e) {
+                    // Property might be non-configurable
                 }
 
+                // 3. Polling fallback (every 200ms)
+                setInterval(hookMixpanel, 200);
+
                 // Hook GA / Gtag
-                wrap(window, 'gtag', 'ga');
+                wrap(window, 'gtag', 'gtag');
 
                 // Hook DataLayer
                 const originalPush = (window as any).dataLayer?.push;
                 if ((window as any).dataLayer) {
                     (window as any).dataLayer.push = function (...args: any[]) {
-                        pushEvent('ga', 'dataLayer.push', args);
+                        pushEvent('dataLayer', 'dataLayer.push', args);
                         return originalPush.apply(this, args);
                     };
                 } else {
@@ -139,7 +157,7 @@ export class BrowserWorker {
                             if (val && val.push) {
                                 const orig = val.push;
                                 val.push = function (...args: any[]) {
-                                    pushEvent('ga', 'dataLayer.push', args);
+                                    pushEvent('dataLayer', 'dataLayer.push', args);
                                     return orig.apply(this, args);
                                 };
                             }
@@ -157,8 +175,14 @@ export class BrowserWorker {
             // 3. Extract Content & Links
             result.html = await page.content();
 
-            // Extract Links with Visibility
-            result.links = await page.evaluate(() => {
+            // Extract Links with Visibility and Click Simulation
+            result.links = await page.evaluate(async () => {
+                // Attempt to freeze SPA navigation
+                try {
+                    window.history.pushState = () => { };
+                    window.history.replaceState = () => { };
+                } catch (e) { }
+
                 const anchors = Array.from(document.querySelectorAll('a[href]'));
 
                 const isElementVisible = (el: Element) => {
@@ -173,8 +197,6 @@ export class BrowserWorker {
                 const findNearestHeading = (el: Element | null): string => {
                     if (!el) return "";
                     try {
-                        // Find the nearest preceding heading (h1-h6) in document order
-                        // XPath: Select all preceding H tags, or ancestor H tags. Take the last one (closest).
                         const xpath = "(./preceding::*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6] | ./ancestor::*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6])[last()]";
                         const result = document.evaluate(xpath, el, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
                         const node = result.singleNodeValue;
@@ -187,19 +209,14 @@ export class BrowserWorker {
                 const getSelector = (el: Element): string => {
                     if (el.id) return `#${el.id}`;
                     if (el === document.body) return 'body';
-
                     let path = [];
                     let current: Element | null = el;
-
                     while (current && current !== document.body) {
                         let selector = current.tagName.toLowerCase();
                         if (current.className && typeof current.className === 'string') {
-                            // Use only first class to avoid overly specific selectors that might break
                             const firstClass = current.className.split(' ')[0];
                             if (firstClass) selector += `.${firstClass}`;
                         }
-
-                        // Add nth-of-type if needed for uniqueness among siblings
                         let sibling = current.previousElementSibling;
                         let index = 1;
                         while (sibling) {
@@ -207,14 +224,15 @@ export class BrowserWorker {
                             sibling = sibling.previousElementSibling;
                         }
                         if (index > 1) selector += `:nth-of-type(${index})`;
-
                         path.unshift(selector);
                         current = current.parentElement;
                     }
                     return path.join(' > ');
                 };
 
-                return anchors.map((anchor) => {
+                // Phase 1: Collect all link metadata (Static Analysis)
+                // We do this first so that if the page crashes/navigates during clicking, we still have the link list.
+                const results = anchors.map((anchor) => {
                     const a = anchor as HTMLAnchorElement;
                     const urlObj = new URL(a.href, window.location.origin);
                     const params: Record<string, string> = {};
@@ -231,8 +249,55 @@ export class BrowserWorker {
                         heading: findNearestHeading(a),
                         utmParams: params,
                         selector: getSelector(a),
+                        triggeredEvents: [] as any[]
                     };
                 });
+
+                // Phase 2: Active Auditing (Click Simulation)
+                for (let i = 0; i < anchors.length; i++) {
+                    const a = anchors[i] as HTMLAnchorElement;
+
+                    // Skip if element is no longer in the DOM or not visible
+                    if (!a.isConnected || !isElementVisible(a)) continue;
+
+                    const startLogLength = (window as any).__trackingLog.length;
+
+                    const preventNav = (e: Event) => {
+                        e.preventDefault();
+                        // Allow propagation for tracking, but prevent default navigation
+                    };
+                    a.addEventListener('click', preventNav);
+
+                    try {
+                        // Simulate full click sequence
+                        const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window });
+                        const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window });
+                        const click = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+
+                        a.dispatchEvent(mousedown);
+                        a.dispatchEvent(mouseup);
+                        a.dispatchEvent(click);
+
+                        // Also call native click if dispatchEvent didn't trigger it (though dispatchEvent click usually suffices)
+                        // But we want to be safe. However, calling click() might double-fire if dispatchEvent worked.
+                        // Let's stick to dispatchEvent for the sequence, but ensure we catch the events.
+                        // Actually, a.click() is the most reliable for 'click' handlers.
+                        // Let's do mousedown/up then click().
+
+                        // Wait for event bubbling and potential async handlers
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    } catch (e) { }
+
+                    a.removeEventListener('click', preventNav);
+
+                    const endLogLength = (window as any).__trackingLog.length;
+                    const result = results[i];
+                    if (endLogLength > startLogLength && result) {
+                        result.triggeredEvents = (window as any).__trackingLog.slice(startLogLength);
+                    }
+                }
+
+                return results;
             });
 
             // 4. Extract Tracking Logs
