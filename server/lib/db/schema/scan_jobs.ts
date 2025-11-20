@@ -51,6 +51,8 @@ export const seoMetrics = pgTable("seo_metrics", {
     jsonLdScore: integer("json_ld_score"),
     jsonLdTypes: text("json_ld_types").array(),
     jsonLdIssues: jsonb("json_ld_issues"),
+    htmlStructureScore: integer("html_structure_score"),
+    htmlStructureIssues: jsonb("html_structure_issues"),
 }, (table) => ({
     pageIdIdx: index("seo_metrics_page_id_idx").on(table.pageId),
 }));

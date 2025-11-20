@@ -11,10 +11,12 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Code2,
   Copy,
   ExternalLink,
+  FileCode,
   Globe,
   Link2,
   Monitor,
@@ -25,6 +27,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { ScanPageWithMetrics } from '@shared/types';
+import { useState } from 'react';
 
 export const Route = createFileRoute('/history/$scanId/pages/$pageId')({
   component: PageDetailRoute,
@@ -40,6 +43,18 @@ function PageDetailRoute() {
   );
 
   const page = pageQuery.data;
+
+  // 可折叠状态管理
+  const [openSections, setOpenSections] = useState({
+    metrics: true,
+    htmlStructure: true,
+    utmLinks: true,
+    trackingEvents: true,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6">
@@ -104,10 +119,16 @@ function PageDetailRoute() {
           </header>
 
           {/* Metrics Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* SEO Card */}
-            <Card title="SEO 元信息" icon={<Globe className="h-4 w-4 text-sky-500" />}>
-              <dl className="space-y-4">
+          <CollapsibleSection
+            title="核心指标概览"
+            icon={<Activity className="h-4 w-4 text-slate-400" />}
+            isOpen={openSections.metrics}
+            onToggle={() => toggleSection('metrics')}
+          >
+            <div className="grid gap-6 lg:grid-cols-3 p-6">
+              {/* SEO Card */}
+              <Card title="SEO 元信息" icon={<Globe className="h-4 w-4 text-sky-500" />}>
+                <dl className="space-y-4">
                 <Field label="Title" value={page.seo?.title} />
                 <Field label="Description" value={page.seo?.metaDescription} />
                 <Field label="H1" value={page.seo?.h1} />
@@ -133,7 +154,7 @@ function PageDetailRoute() {
                       {page.seo.jsonLdScore !== null && page.seo.jsonLdScore !== undefined ? (
                         <div className="flex items-center gap-2">
                           <span className={`text-sm font-semibold ${page.seo.jsonLdScore >= 70 ? 'text-emerald-600' :
-                              page.seo.jsonLdScore >= 40 ? 'text-amber-600' : 'text-rose-600'
+                            page.seo.jsonLdScore >= 40 ? 'text-amber-600' : 'text-rose-600'
                             }`}>
                             {page.seo.jsonLdScore}
                           </span>
@@ -154,7 +175,7 @@ function PageDetailRoute() {
                                   {schema.type}
                                 </span>
                                 <span className={`text-xs font-medium ${schema.score >= 70 ? 'text-emerald-600' :
-                                    schema.score >= 40 ? 'text-amber-600' : 'text-rose-600'
+                                  schema.score >= 40 ? 'text-amber-600' : 'text-rose-600'
                                   }`}>
                                   {schema.score}
                                 </span>
@@ -174,8 +195,8 @@ function PageDetailRoute() {
                                       <span
                                         key={field}
                                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${exists
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-rose-50 text-rose-700 border border-rose-200'
                                           }`}
                                       >
                                         {exists ? '✓' : '✗'} {field}
@@ -194,8 +215,8 @@ function PageDetailRoute() {
                                       <span
                                         key={field}
                                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${exists
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                            : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-slate-50 text-slate-500 border border-slate-200'
                                           }`}
                                       >
                                         {exists ? '✓' : '○'} {field}
@@ -294,31 +315,267 @@ function PageDetailRoute() {
                 </div>
               </dl>
             </Card>
-          </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* HTML Structure Audit Card */}
+          {page.seo?.htmlStructureIssues && (
+            <CollapsibleSection
+              title="HTML 结构审计"
+              icon={<FileCode className="h-4 w-4 text-purple-500" />}
+              isOpen={openSections.htmlStructure}
+              onToggle={() => toggleSection('htmlStructure')}
+            >
+              <div className="p-6 space-y-4">
+                  {/* Semantic Tags */}
+                  {page.seo.htmlStructureIssues.semanticTags && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">语义化标签</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {['header', 'nav', 'main', 'footer', 'article', 'aside', 'section'].map(tag => {
+                          const propertyName = `has${tag.charAt(0).toUpperCase() + tag.slice(1)}` as keyof typeof page.seo.htmlStructureIssues.semanticTags;
+                          const hasTag = page.seo?.htmlStructureIssues?.semanticTags?.[propertyName];
+                          return (
+                            <span
+                              key={tag}
+                              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${hasTag ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                }`}
+                            >
+                              {hasTag ? '✓' : '✗'} &lt;{tag}&gt;
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Heading Structure */}
+                  {page.seo.htmlStructureIssues.headingStructure && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">标题层级</span>
+                        <span className="text-xs text-slate-500">
+                          {page.seo.htmlStructureIssues.headingStructure.hierarchy?.length || 0} 个标题
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <div className={`flex items-center justify-between p-2 rounded ${page.seo.htmlStructureIssues.headingStructure.hasH1 ? 'bg-emerald-50' : 'bg-rose-50'
+                          }`}>
+                          <span className="text-slate-600">H1 标签</span>
+                          <span className={page.seo.htmlStructureIssues.headingStructure.hasH1 ? 'text-emerald-700' : 'text-rose-700'}>
+                            {page.seo.htmlStructureIssues.headingStructure.hasH1 ? '✓ 存在' : '✗ 缺失'}
+                          </span>
+                        </div>
+                        {page.seo.htmlStructureIssues.headingStructure.multipleH1 && (
+                          <div className="flex items-center justify-between p-2 rounded bg-amber-50">
+                            <span className="text-slate-600">多个 H1</span>
+                            <span className="text-amber-700">⚠ 警告</span>
+                          </div>
+                        )}
+                        {page.seo.htmlStructureIssues.headingStructure.skippedLevels?.length > 0 && (
+                          <div className="p-2 rounded bg-amber-50">
+                            <span className="text-slate-600">跳过的层级: </span>
+                            <span className="text-amber-700 font-medium">
+                              {page.seo.htmlStructureIssues.headingStructure.skippedLevels.map((l: number) => `h${l}`).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Heading Hierarchy Details */}
+                      {page.seo.htmlStructureIssues.headingStructure.hierarchy && page.seo.htmlStructureIssues.headingStructure.hierarchy.length > 0 && (
+                        <details className="mt-2 border-t border-slate-100 pt-2">
+                          <summary className="text-xs font-medium text-slate-700 cursor-pointer hover:text-slate-900">
+                            查看标题层级结构 ({page.seo.htmlStructureIssues.headingStructure.hierarchy.length})
+                          </summary>
+                          <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                            {page.seo.htmlStructureIssues.headingStructure.hierarchy.map((h: any, idx: number) => (
+                              <div key={idx} className="flex items-start gap-2 p-2 rounded bg-slate-50 text-xs" style={{ paddingLeft: `${h.level * 8 + 8}px` }}>
+                                <span className="shrink-0 font-bold text-slate-500">H{h.level}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-slate-700 truncate" title={h.text}>
+                                    {h.text || <span className="italic text-slate-400">空标题</span>}
+                                  </div>
+                                  {h.issues && h.issues.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {h.issues.map((issue: string, issueIdx: number) => (
+                                        <span key={issueIdx} className="inline-flex px-1 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                                          {issue}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Images */}
+                  {page.seo.htmlStructureIssues.images && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">图片</span>
+                        <span className="text-xs text-slate-500">
+                          {page.seo.htmlStructureIssues.images.total} 张
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded bg-slate-50 border border-slate-100">
+                          <div className="text-slate-500">缺失 Alt</div>
+                          <div className={`text-lg font-semibold ${page.seo.htmlStructureIssues.images.missingAlt > 0 ? 'text-rose-600' : 'text-emerald-600'
+                            }`}>
+                            {page.seo.htmlStructureIssues.images.missingAlt}
+                          </div>
+                        </div>
+                        <div className="p-2 rounded bg-slate-50 border border-slate-100">
+                          <div className="text-slate-500">懒加载</div>
+                          <div className="text-lg font-semibold text-slate-900">{page.seo.htmlStructureIssues.images.lazyLoadable}</div>
+                        </div>
+                        <div className="p-2 rounded bg-slate-50 border border-slate-100">
+                          <div className="text-slate-500">有尺寸</div>
+                          <div className="text-lg font-semibold text-slate-900">{page.seo.htmlStructureIssues.images.withDimensions}</div>
+                        </div>
+                        <div className="p-2 rounded bg-slate-50 border border-slate-100">
+                          <div className="text-slate-500">缺失尺寸</div>
+                          <div className={`text-lg font-semibold ${
+                            (page.seo.htmlStructureIssues.images.total - page.seo.htmlStructureIssues.images.withDimensions) > 0 ? 'text-amber-600' : 'text-emerald-600'
+                          }`}>
+                            {page.seo.htmlStructureIssues.images.total - page.seo.htmlStructureIssues.images.withDimensions}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Image Details */}
+                      {page.seo.htmlStructureIssues.images.examples && page.seo.htmlStructureIssues.images.examples.length > 0 && (
+                        <details className="mt-2 border-t border-slate-100 pt-2">
+                          <summary className="text-xs font-medium text-slate-700 cursor-pointer hover:text-slate-900">
+                            查看问题图片详情 ({page.seo.htmlStructureIssues.images.examples.length})
+                          </summary>
+                          <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                            {page.seo.htmlStructureIssues.images.examples.map((img: any, idx: number) => (
+                              <div key={idx} className="p-2 rounded bg-slate-50 border border-slate-200 text-xs">
+                                <div className="font-mono text-slate-600 truncate mb-1" title={img.src}>
+                                  {img.src}
+                                </div>
+                                {img.issues && img.issues.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1">
+                                    {img.issues.map((issue: string, issueIdx: number) => (
+                                      <span key={issueIdx} className="inline-flex px-1.5 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
+                                        {issue}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {img.alt && (
+                                  <div className="text-[10px] text-slate-500">Alt: {img.alt}</div>
+                                )}
+                                {(img.width || img.height) && (
+                                  <div className="text-[10px] text-slate-500">
+                                    尺寸: {img.width} × {img.height}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+
+                  {/* Forms */}
+                  {page.seo.htmlStructureIssues.forms && page.seo.htmlStructureIssues.forms.total > 0 && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">表单</span>
+                        <span className="text-xs text-slate-500">
+                          {page.seo.htmlStructureIssues.forms.total} 个表单, {page.seo.htmlStructureIssues.forms.inputs} 个输入
+                        </span>
+                      </div>
+                      {page.seo.htmlStructureIssues.forms.missingLabels > 0 && (
+                        <div className="p-2 rounded bg-rose-50 border border-rose-200 text-xs">
+                          <span className="text-rose-700 font-medium">
+                            ⚠ {page.seo.htmlStructureIssues.forms.missingLabels} 个输入缺失标签
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ARIA */}
+                  {page.seo.htmlStructureIssues.aria && page.seo.htmlStructureIssues.aria.missingAriaLabels > 0 && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">可访问性</span>
+                      </div>
+                      <div className="p-2 rounded bg-rose-50 border border-rose-200 text-xs">
+                        <span className="text-rose-700 font-medium">
+                          ⚠ {page.seo.htmlStructureIssues.aria.missingAriaLabels} 个交互元素缺失可访问名称
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Errors and Warnings Summary */}
+                  {(page.seo.htmlStructureIssues.errors?.length > 0 || page.seo.htmlStructureIssues.warnings?.length > 0) && (
+                    <details className="border-t border-slate-100 pt-4">
+                      <summary className="text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 flex items-center gap-2">
+                        <span>所有问题</span>
+                        <span className="text-xs text-slate-500">
+                          ({(page.seo.htmlStructureIssues.errors?.length || 0) + (page.seo.htmlStructureIssues.warnings?.length || 0)})
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-2 max-h-80 overflow-y-auto">
+                        {page.seo.htmlStructureIssues.errors?.map((error: string, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2 p-2 rounded bg-rose-50 text-xs">
+                            <span className="text-rose-600 font-bold">✗</span>
+                            <span className="text-rose-700">{error}</span>
+                          </div>
+                        ))}
+                        {page.seo.htmlStructureIssues.warnings?.map((warning: string, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2 p-2 rounded bg-amber-50 text-xs">
+                            <span className="text-amber-600 font-bold">⚠</span>
+                            <span className="text-amber-700">{warning}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+              </div>
+            </CollapsibleSection>
+          )}
 
           {/* UTM Link Table */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-6 py-4 flex items-center gap-2">
-              <Link2 className="h-4 w-4 text-slate-400" />
-              <h2 className="font-semibold text-slate-900">UTM 链接清单</h2>
-            </div>
+          <CollapsibleSection
+            title="UTM 链接清单"
+            icon={<Link2 className="h-4 w-4 text-slate-400" />}
+            isOpen={openSections.utmLinks}
+            onToggle={() => toggleSection('utmLinks')}
+          >
             <UtmLinkTable summary={page.links?.utmSummary} />
-          </section>
+          </CollapsibleSection>
 
           {/* Tracking Events */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-slate-400" />
-                <h2 className="font-semibold text-slate-900">埋点事件</h2>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                  {page.trackingEvents.length}
-                </span>
-              </div>
-            </div>
-            {page.trackingEvents.length > 0 ? (
+          <CollapsibleSection
+            title="埋点事件"
+            icon={<Activity className="h-4 w-4 text-slate-400" />}
+            isOpen={openSections.trackingEvents}
+            onToggle={() => toggleSection('trackingEvents')}
+            badge={
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                {page?.trackingEvents?.length ?? 0}
+              </span>
+            }
+          >
+            {(page?.trackingEvents?.length ?? 0) > 0 ? (
               <div className="divide-y divide-slate-100">
-                {page.trackingEvents.map((event) => (
+                {page.trackingEvents?.map((event) => (
                   <div key={event.id} className="flex flex-col gap-3 px-6 py-4 hover:bg-slate-50 transition-colors sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4 overflow-hidden w-full">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mt-0.5">
@@ -359,7 +616,7 @@ function PageDetailRoute() {
                 未检测到埋点脚本
               </div>
             )}
-          </section>
+          </CollapsibleSection>
         </div>
       ) : pageQuery.isPending ? (
         <div className="flex h-64 items-center justify-center text-sm text-slate-500">
@@ -373,6 +630,40 @@ function PageDetailRoute() {
     </div>
   );
 }
+
+const CollapsibleSection = ({
+  title,
+  icon,
+  isOpen,
+  onToggle,
+  badge,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) => (
+  <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <button
+      onClick={onToggle}
+      className="w-full border-b border-slate-100 px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        {icon}
+        <h2 className="font-semibold text-slate-900">{title}</h2>
+        {badge}
+      </div>
+      <ChevronDown
+        className={`h-5 w-5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''
+          }`}
+      />
+    </button>
+    {isOpen && <div>{children}</div>}
+  </section>
+);
 
 const Card = ({
   title,

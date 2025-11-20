@@ -83,7 +83,7 @@ export function DashboardLayout() {
 
                 <div className="border-t border-sidebar-border p-4">
                     <div className="rounded-lg bg-sidebar-accent/50 p-4 text-xs text-sidebar-foreground/60">
-                        <p className="font-medium text-sidebar-foreground">Bun SEO Checker</p>
+                        <p className="font-medium text-sidebar-foreground">SEO Checker</p>
                         <p className="mt-1">v0.1.0 Beta</p>
                     </div>
                 </div>

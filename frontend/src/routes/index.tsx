@@ -26,7 +26,7 @@ function HomeRoute() {
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 px-8 py-12 text-white shadow-xl sm:px-12 sm:py-16">
         <div className="relative z-10 max-w-2xl space-y-6">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            全栈 SEO 与埋点巡检
+            SEO 与埋点巡检
           </h1>
           <p className="text-lg text-indigo-100">
             一键扫描，实时洞察。支持单页分析与整站爬取，自动检测 SEO 标签、UTM 参数及埋点覆盖率。

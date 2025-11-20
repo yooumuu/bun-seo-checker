@@ -106,16 +106,26 @@ type IssueSummaryMeta = {
     seoScore: number;
     jsonLdScore?: number;
     jsonLdTypes?: string[];
+    htmlStructureScore?: number;
+};
+
+type HtmlStructureIssueMap = Record<string, number> & {
+    semanticIssues: number;
+    headingIssues: number;
+    imageIssues: number;
+    accessibilityIssues: number;
 };
 
 export type IssueSummary = {
     seo: SeoIssueMap;
     links: LinkIssueMap;
     tracking: TrackingIssueMap;
+    htmlStructure?: HtmlStructureIssueMap;
     totals: {
         seoIssues: number;
         linkIssues: number;
         trackingIssues: number;
+        htmlStructureIssues?: number;
     };
     meta: IssueSummaryMeta;
 };
@@ -399,7 +409,8 @@ export const analyzeTracking = (html: string): TrackingEventAnalysis[] => {
 export const buildIssueSummary = (
     seo: SeoAnalysis,
     links: LinkAnalysis,
-    tracking: TrackingEventAnalysis[]
+    tracking: TrackingEventAnalysis[],
+    htmlStructure?: any
 ): IssueSummary => {
     const mixpanelPresent = tracking.some(
         (event) => event.platform === "mixpanel"
@@ -429,22 +440,62 @@ export const buildIssueSummary = (
         gaMissing: !gaPresent,
     };
 
+    let htmlStructureMap: HtmlStructureIssueMap | undefined;
+    let htmlStructureIssuesCount = 0;
+
+    if (htmlStructure) {
+        // Count semantic issues
+        const semanticIssues =
+            (!htmlStructure.semanticTags?.hasMain ? 1 : 0) +
+            (!htmlStructure.semanticTags?.hasHeader ? 1 : 0) +
+            (!htmlStructure.semanticTags?.hasNav ? 1 : 0) +
+            (!htmlStructure.semanticTags?.hasFooter ? 1 : 0);
+
+        // Count heading issues
+        const headingIssues =
+            (!htmlStructure.headingStructure?.hasH1 ? 1 : 0) +
+            (htmlStructure.headingStructure?.multipleH1 ? 1 : 0) +
+            (htmlStructure.headingStructure?.skippedLevels?.length || 0);
+
+        // Count image issues
+        const imageIssues =
+            (htmlStructure.images?.missingAlt || 0);
+
+        // Count accessibility issues
+        const accessibilityIssues =
+            (htmlStructure.forms?.missingLabels || 0) +
+            (htmlStructure.aria?.missingAriaLabels || 0) +
+            (htmlStructure.lists?.emptyLists || 0);
+
+        htmlStructureMap = {
+            semanticIssues,
+            headingIssues,
+            imageIssues,
+            accessibilityIssues,
+        };
+
+        htmlStructureIssuesCount = semanticIssues + headingIssues + imageIssues + accessibilityIssues;
+    }
+
     const totals = {
         seoIssues: Object.values(seoMap).filter(Boolean).length,
         linkIssues: links.utmSummary.missingUtm,
         trackingIssues:
             Number(trackingMap.mixpanelMissing) + Number(trackingMap.gaMissing),
+        htmlStructureIssues: htmlStructureIssuesCount > 0 ? htmlStructureIssuesCount : undefined,
     };
 
     return {
         seo: seoMap,
         links: linkMap,
         tracking: trackingMap,
+        htmlStructure: htmlStructureMap,
         totals,
         meta: {
             seoScore: seo.score,
             jsonLdScore: seo.jsonLdAnalysis?.score,
             jsonLdTypes: seo.jsonLdAnalysis?.types,
+            htmlStructureScore: htmlStructure?.overallScore,
         },
     };
 };

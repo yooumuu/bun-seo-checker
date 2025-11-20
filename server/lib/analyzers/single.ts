@@ -249,7 +249,11 @@ export const scanSinglePage = async (
             const jsonLdAnalysis = analyzeJsonLd(html);
             seo.jsonLdAnalysis = jsonLdAnalysis;
 
-            const issueSummary = buildIssueSummary(seo, links, tracking);
+            // 分析 HTML 结构
+            const { analyzeHtmlStructure } = await import("./htmlStructure.js");
+            const htmlStructureAnalysis = analyzeHtmlStructure(html);
+
+            const issueSummary = buildIssueSummary(seo, links, tracking, htmlStructureAnalysis);
 
             await tx
                 .update(scanPages)
@@ -284,6 +288,8 @@ export const scanSinglePage = async (
                         recommendedFields: s.recommendedFields,
                     })),
                 },
+                htmlStructureScore: htmlStructureAnalysis.overallScore,
+                htmlStructureIssues: htmlStructureAnalysis,
             });
 
             await tx.insert(linkMetrics).values({

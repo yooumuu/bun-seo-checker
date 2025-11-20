@@ -16,6 +16,7 @@ import {
     trackingEvents,
 } from "../db/schema";
 import type { IssueSummary, LinkAnalysis } from "../analyzers/html";
+import type { HtmlStructureAnalysis } from "../analyzers/htmlStructure";
 
 type TrackingEventRecord = typeof trackingEvents.$inferSelect;
 
@@ -67,6 +68,8 @@ export type PageWithMetrics = {
                 recommendedFields: Record<string, boolean>;
             }>;
         } | null;
+        htmlStructureScore: number | null;
+        htmlStructureIssues: HtmlStructureAnalysis | null;
     } | null;
     links: {
         internalLinks: number | null;
@@ -113,6 +116,8 @@ export const listPagesForJob = async (
                 jsonLdScore: seoMetrics.jsonLdScore,
                 jsonLdTypes: seoMetrics.jsonLdTypes,
                 jsonLdIssues: seoMetrics.jsonLdIssues,
+                htmlStructureScore: seoMetrics.htmlStructureScore,
+                htmlStructureIssues: seoMetrics.htmlStructureIssues,
             },
             linksId: linkMetrics.id,
             links: {
@@ -142,9 +147,9 @@ export const listPagesForJob = async (
     const pageIds = rows.map((row) => row.page.id);
     const tracking = pageIds.length
         ? await db
-              .select()
-              .from(trackingEvents)
-              .where(inArray(trackingEvents.pageId, pageIds))
+            .select()
+            .from(trackingEvents)
+            .where(inArray(trackingEvents.pageId, pageIds))
         : [];
 
     const trackingByPage = new Map<number, TrackingEventRecord[]>();
@@ -159,29 +164,31 @@ export const listPagesForJob = async (
             row.seoId === null
                 ? null
                 : {
-                      title: row.seo?.title ?? null,
-                      metaDescription: row.seo?.metaDescription ?? null,
-                      canonical: row.seo?.canonical ?? null,
-                      h1: row.seo?.h1 ?? null,
-                      robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
-                      schemaOrg: row.seo?.schemaOrg ?? null,
-                      score: row.seo?.score ?? null,
-                      jsonLdScore: row.seo?.jsonLdScore ?? null,
-                      jsonLdTypes: row.seo?.jsonLdTypes ?? null,
-                      jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
-                  };
+                    title: row.seo?.title ?? null,
+                    metaDescription: row.seo?.metaDescription ?? null,
+                    canonical: row.seo?.canonical ?? null,
+                    h1: row.seo?.h1 ?? null,
+                    robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
+                    schemaOrg: row.seo?.schemaOrg ?? null,
+                    score: row.seo?.score ?? null,
+                    jsonLdScore: row.seo?.jsonLdScore ?? null,
+                    jsonLdTypes: row.seo?.jsonLdTypes ?? null,
+                    jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
+                    htmlStructureScore: row.seo?.htmlStructureScore ?? null,
+                    htmlStructureIssues: row.seo?.htmlStructureIssues as any ?? null,
+                };
 
         const links =
             row.linksId === null
                 ? null
                 : {
-                      internalLinks: row.links?.internalLinks ?? null,
-                      externalLinks: row.links?.externalLinks ?? null,
-                      utmSummary: (row.links?.utmSummary ??
-                          null) as LinkAnalysis["utmSummary"] | null,
-                      brokenLinks: row.links?.brokenLinks ?? null,
-                      redirects: row.links?.redirects ?? null,
-                  };
+                    internalLinks: row.links?.internalLinks ?? null,
+                    externalLinks: row.links?.externalLinks ?? null,
+                    utmSummary: (row.links?.utmSummary ??
+                        null) as LinkAnalysis["utmSummary"] | null,
+                    brokenLinks: row.links?.brokenLinks ?? null,
+                    redirects: row.links?.redirects ?? null,
+                };
 
         return {
             id: row.page.id,
@@ -225,6 +232,8 @@ export const getPageForJob = async (jobId: number, pageId: number) => {
                 jsonLdScore: seoMetrics.jsonLdScore,
                 jsonLdTypes: seoMetrics.jsonLdTypes,
                 jsonLdIssues: seoMetrics.jsonLdIssues,
+                htmlStructureScore: seoMetrics.htmlStructureScore,
+                htmlStructureIssues: seoMetrics.htmlStructureIssues,
             },
             linksId: linkMetrics.id,
             links: {
@@ -264,28 +273,30 @@ export const getPageForJob = async (jobId: number, pageId: number) => {
             row.seoId === null
                 ? null
                 : {
-                      title: row.seo?.title ?? null,
-                      metaDescription: row.seo?.metaDescription ?? null,
-                      canonical: row.seo?.canonical ?? null,
-                      h1: row.seo?.h1 ?? null,
-                      robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
-                      schemaOrg: row.seo?.schemaOrg ?? null,
-                      score: row.seo?.score ?? null,
-                      jsonLdScore: row.seo?.jsonLdScore ?? null,
-                      jsonLdTypes: row.seo?.jsonLdTypes ?? null,
-                      jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
-                  },
+                    title: row.seo?.title ?? null,
+                    metaDescription: row.seo?.metaDescription ?? null,
+                    canonical: row.seo?.canonical ?? null,
+                    h1: row.seo?.h1 ?? null,
+                    robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
+                    schemaOrg: row.seo?.schemaOrg ?? null,
+                    score: row.seo?.score ?? null,
+                    jsonLdScore: row.seo?.jsonLdScore ?? null,
+                    jsonLdTypes: row.seo?.jsonLdTypes ?? null,
+                    jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
+                    htmlStructureScore: row.seo?.htmlStructureScore ?? null,
+                    htmlStructureIssues: row.seo?.htmlStructureIssues as any ?? null,
+                },
         links:
             row.linksId === null
                 ? null
                 : {
-                      internalLinks: row.links?.internalLinks ?? null,
-                      externalLinks: row.links?.externalLinks ?? null,
-                      utmSummary: (row.links?.utmSummary ??
-                          null) as LinkAnalysis["utmSummary"] | null,
-                      brokenLinks: row.links?.brokenLinks ?? null,
-                      redirects: row.links?.redirects ?? null,
-                  },
+                    internalLinks: row.links?.internalLinks ?? null,
+                    externalLinks: row.links?.externalLinks ?? null,
+                    utmSummary: (row.links?.utmSummary ??
+                        null) as LinkAnalysis["utmSummary"] | null,
+                    brokenLinks: row.links?.brokenLinks ?? null,
+                    redirects: row.links?.redirects ?? null,
+                },
         trackingEvents: tracking,
     } satisfies PageWithMetrics;
 };
