@@ -73,7 +73,7 @@ RUN apt-get update && \
 COPY package.json bun.lock ./
 
 # Install backend dependencies
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile
 
 # Install playwright browsers
 RUN bunx playwright install chromium
