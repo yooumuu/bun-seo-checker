@@ -1209,14 +1209,155 @@ const TrackingEventsTable = ({
                                     {eventExpanded ? '收起事件数据' : '查看事件数据'}
                                   </button>
                                   {eventExpanded ? (
-                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 max-h-48 overflow-auto">
-                                      <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-slate-700 leading-relaxed">
-                                        {tryFormatJson(event.eventName) || event.eventName}
-                                      </pre>
+                                    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                      {(() => {
+                                        try {
+                                          let payload = typeof event.eventName === 'string' ? JSON.parse(event.eventName) : event.eventName;
+
+                                          // Helper: Convert array-like object to array
+                                          const normalizeArrayLikeObject = (obj: any): any => {
+                                            if (obj === null || obj === undefined) return obj;
+                                            if (Array.isArray(obj)) return obj;
+                                            if (typeof obj !== 'object') return obj;
+
+                                            // Check if object has numeric keys starting from 0
+                                            const keys = Object.keys(obj);
+                                            const isArrayLike = keys.length > 0 && keys.every((k, i) => k === String(i));
+
+                                            if (isArrayLike) {
+                                              // Convert to array
+                                              return keys.map(k => obj[k]);
+                                            }
+
+                                            return obj;
+                                          };
+
+                                          // Normalize the payload
+                                          payload = normalizeArrayLikeObject(payload);
+
+                                          // Also normalize nested objects
+                                          if (Array.isArray(payload)) {
+                                            payload = payload.map(item => normalizeArrayLikeObject(item));
+                                          }
+
+                                          // Handle array format: ["event_name", {...}] or [...]
+                                          if (Array.isArray(payload)) {
+                                            // Check if it's the ["event_name", {...}] pattern
+                                            if (payload.length >= 2 && typeof payload[0] === 'string' && typeof payload[1] === 'object') {
+                                              const eventName = payload[0];
+                                              const eventData = payload[1];
+
+                                              return (
+                                                <div>
+                                                  {/* Event Name Header */}
+                                                  <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="text-xs font-semibold text-slate-500">事件名称:</span>
+                                                      <code className="text-xs font-mono text-indigo-600 font-semibold">{eventName}</code>
+                                                    </div>
+                                                  </div>
+
+                                                  {/* Event Properties Table */}
+                                                  {eventData && typeof eventData === 'object' && !Array.isArray(eventData) && Object.keys(eventData).length > 0 && (
+                                                    <div className="divide-y divide-slate-100">
+                                                      {Object.entries(eventData).map(([key, value]) => (
+                                                        <div key={key} className="px-3 py-2 hover:bg-slate-50 transition-colors">
+                                                          <div className="flex items-start gap-3">
+                                                            <span className="text-xs font-medium text-slate-600 shrink-0 min-w-[100px]">{key}:</span>
+                                                            <code className="text-xs font-mono text-slate-800 break-all">
+                                                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                            </code>
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            }
+
+                                            // Handle array with single object: [{...}]
+                                            if (payload.length === 1 && typeof payload[0] === 'object' && !Array.isArray(payload[0])) {
+                                              const eventData = payload[0];
+                                              return (
+                                                <div className="divide-y divide-slate-100">
+                                                  {Object.entries(eventData).map(([key, value]) => (
+                                                    <div key={key} className="px-3 py-2 hover:bg-slate-50 transition-colors">
+                                                      <div className="flex items-start gap-3">
+                                                        <span className="text-xs font-medium text-slate-600 shrink-0 min-w-[100px]">{key}:</span>
+                                                        <code className="text-xs font-mono text-slate-800 break-all">
+                                                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                        </code>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              );
+                                            }
+
+                                            // Fallback: show as JSON for complex arrays
+                                            return (
+                                              <div className="p-3 bg-slate-50">
+                                                <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-slate-700 leading-relaxed">
+                                                  {JSON.stringify(payload, null, 2)}
+                                                </pre>
+                                              </div>
+                                            );
+                                          }
+
+                                          // Handle object format
+                                          if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
+                                            return (
+                                              <div className="divide-y divide-slate-100">
+                                                {Object.entries(payload).map(([key, value]) => (
+                                                  <div key={key} className="px-3 py-2 hover:bg-slate-50 transition-colors">
+                                                    <div className="flex items-start gap-3">
+                                                      <span className="text-xs font-medium text-slate-600 shrink-0 min-w-[100px]">{key}:</span>
+                                                      <code className="text-xs font-mono text-slate-800 break-all">
+                                                        {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}
+                                                      </code>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+
+                                          // Fallback: raw display for primitives
+                                          return (
+                                            <div className="p-3 bg-slate-50">
+                                              <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-slate-700">
+                                                {JSON.stringify(payload, null, 2)}
+                                              </pre>
+                                            </div>
+                                          );
+                                        } catch (e) {
+                                          // If parsing fails, show raw data with error info
+                                          console.error('Failed to parse event data:', e);
+                                          return (
+                                            <div className="p-3 bg-amber-50 border-l-4 border-amber-400">
+                                              <p className="text-xs text-amber-800 mb-2">⚠️ 无法解析事件数据，显示原始格式：</p>
+                                              <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-slate-700 leading-relaxed">
+                                                {String(event.eventName)}
+                                              </pre>
+                                            </div>
+                                          );
+                                        }
+                                      })()}
                                     </div>
                                   ) : (
                                     <div className="text-xs text-slate-400 truncate font-mono">
-                                      {event.eventName.substring(0, 60)}...
+                                      {(() => {
+                                        try {
+                                          const payload = typeof event.eventName === 'string' ? JSON.parse(event.eventName) : event.eventName;
+                                          if (Array.isArray(payload) && payload[0]) {
+                                            return `${payload[0]} ${JSON.stringify(payload[1] || {})}`.substring(0, 60) + '...';
+                                          }
+                                          return String(event.eventName).substring(0, 60) + '...';
+                                        } catch {
+                                          return String(event.eventName).substring(0, 60) + '...';
+                                        }
+                                      })()}
                                     </div>
                                   )}
                                 </div>
