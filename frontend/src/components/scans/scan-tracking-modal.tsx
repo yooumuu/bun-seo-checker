@@ -48,7 +48,6 @@ export function ScanTrackingModal({ scanId, isOpen, onClose }: ScanTrackingModal
         setAutoRedirectCountdown((prev) => {
           if (prev === null || prev <= 1) {
             clearInterval(interval);
-            handleViewResults();
             return null;
           }
           return prev - 1;
@@ -58,6 +57,13 @@ export function ScanTrackingModal({ scanId, isOpen, onClose }: ScanTrackingModal
       return () => clearInterval(interval);
     }
   }, [scan?.status]);
+
+  // Handle redirect when countdown reaches 0
+  useEffect(() => {
+    if (autoRedirectCountdown === 0) {
+      handleViewResults();
+    }
+  }, [autoRedirectCountdown]);
 
   const handleViewResults = () => {
     navigate({ to: '/history/$scanId', params: { scanId: scanId.toString() } });

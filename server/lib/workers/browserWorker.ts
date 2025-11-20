@@ -89,12 +89,14 @@ export class BrowserWorker {
                 (window as any).__mixpanelHooked = false;
 
                 const pushEvent = (platform: string, type: string, payload: any) => {
-                    (window as any).__trackingLog.push({
+                    const event = {
                         platform,
                         type,
                         payload,
                         ts: Date.now(),
-                    });
+                    };
+                    (window as any).__trackingLog.push(event);
+                    console.log(`[Tracking] ${platform}.${type}`, payload);
                 };
 
                 // Hook Mixpanel - Enhanced version
@@ -112,15 +114,22 @@ export class BrowserWorker {
                 const hookMixpanel = () => {
                     try {
                         const mp = (window as any).mixpanel;
-                        if (!mp) return;
+                        if (!mp) {
+                            console.log('[Tracking Hook] Mixpanel not found yet');
+                            return;
+                        }
 
                         // Hook all Mixpanel methods
                         const methods = ['track', 'identify', 'alias', 'register', 'reset', 'time_event', 'track_links', 'track_forms'];
                         let hookedAny = false;
 
                         methods.forEach(method => {
-                            if (typeof mp[method] === 'function' && wrap(mp, method, 'mixpanel')) {
-                                hookedAny = true;
+                            if (typeof mp[method] === 'function') {
+                                const hooked = wrap(mp, method, 'mixpanel');
+                                if (hooked) {
+                                    hookedAny = true;
+                                    console.log(`[Tracking Hook] Hooked mixpanel.${method}`);
+                                }
                             }
                         });
 
@@ -128,23 +137,46 @@ export class BrowserWorker {
                         if (mp.people && typeof mp.people === 'object') {
                             const peopleMethods = ['set', 'set_once', 'increment', 'append', 'union', 'track_charge'];
                             peopleMethods.forEach(method => {
-                                if (typeof mp.people[method] === 'function' && wrap(mp.people, method, 'mixpanel')) {
-                                    hookedAny = true;
+                                if (typeof mp.people[method] === 'function') {
+                                    const hooked = wrap(mp.people, method, 'mixpanel');
+                                    if (hooked) {
+                                        hookedAny = true;
+                                        console.log(`[Tracking Hook] Hooked mixpanel.people.${method}`);
+                                    }
                                 }
                             });
                         }
 
                         // Hook array-based queue (for pre-initialization)
-                        if (Array.isArray(mp) && wrap(mp, 'push', 'mixpanel')) {
-                            hookedAny = true;
+                        if (Array.isArray(mp)) {
+                            const hooked = wrap(mp, 'push', 'mixpanel');
+                            if (hooked) {
+                                hookedAny = true;
+                                console.log('[Tracking Hook] Hooked mixpanel.push (queue mode)');
+                            }
+                        }
+
+                        // Detect and log autotrack configuration
+                        if (mp.config && mp.config.autotrack) {
+                            console.log('[Tracking Hook] Mixpanel Autotrack is enabled');
+                            (window as any).__mixpanelAutotrackEnabled = true;
+                        }
+
+                        // Hook _track_dom (internal autotrack method)
+                        if (mp._track_dom && typeof mp._track_dom === 'function') {
+                            const hooked = wrap(mp, '_track_dom', 'mixpanel');
+                            if (hooked) {
+                                hookedAny = true;
+                                console.log('[Tracking Hook] Hooked mixpanel._track_dom');
+                            }
                         }
 
                         if (hookedAny && !(window as any).__mixpanelHooked) {
                             (window as any).__mixpanelHooked = true;
-                            console.log('[Tracking Hook] Mixpanel SDK hooked successfully');
+                            console.log('[Tracking Hook] ✅ Mixpanel SDK hooked successfully');
                         }
                     } catch (e) {
-                        console.error('[Tracking Hook] Failed to hook Mixpanel:', e);
+                        console.error('[Tracking Hook] ❌ Failed to hook Mixpanel:', e);
                     }
                 };
 
@@ -225,6 +257,9 @@ export class BrowserWorker {
             // Wait longer for hydration and analytics SDK loading
             // Many analytics scripts load asynchronously after page load
             await page.waitForTimeout(4000);
+
+            // Mark the baseline - all events before this are page-level (not link-specific)
+            const baselineEventCount = await page.evaluate(() => (window as any).__trackingLog?.length || 0);
 
             // 3. Extract Content & Links
             result.html = await page.content();
@@ -352,7 +387,11 @@ export class BrowserWorker {
                 });
 
                 // Phase 2: Active Auditing (Click Simulation)
-                for (let i = 0; i < anchors.length; i++) {
+                // Limit to first 20 visible links to avoid excessive scan time
+                const maxLinksToTest = 20;
+                let testedCount = 0;
+
+                for (let i = 0; i < anchors.length && testedCount < maxLinksToTest; i++) {
                     const a = anchors[i] as HTMLAnchorElement;
 
                     // Skip if element is no longer in the DOM or not visible
@@ -362,29 +401,39 @@ export class BrowserWorker {
 
                     const preventNav = (e: Event) => {
                         e.preventDefault();
-                        // Allow propagation for tracking, but prevent default navigation
+                        // DON'T use stopPropagation() - it prevents tracking handlers from firing!
                     };
+
+                    // Add listener to prevent navigation, but allow propagation for tracking
                     a.addEventListener('click', preventNav);
 
                     try {
                         // Simulate full click sequence
-                        const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window });
-                        const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window });
-                        const click = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                        const mousedown = new MouseEvent('mousedown', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        const mouseup = new MouseEvent('mouseup', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        const click = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
 
                         a.dispatchEvent(mousedown);
                         a.dispatchEvent(mouseup);
                         a.dispatchEvent(click);
 
-                        // Also call native click if dispatchEvent didn't trigger it (though dispatchEvent click usually suffices)
-                        // But we want to be safe. However, calling click() might double-fire if dispatchEvent worked.
-                        // Let's stick to dispatchEvent for the sequence, but ensure we catch the events.
-                        // Actually, a.click() is the most reliable for 'click' handlers.
-                        // Let's do mousedown/up then click().
-
-                        // Wait for event bubbling and potential async handlers
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                    } catch (e) { }
+                        // Wait for async tracking handlers (Mixpanel may use setTimeout)
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    } catch (e) {
+                        console.error('Click simulation error:', e);
+                    }
 
                     a.removeEventListener('click', preventNav);
 
@@ -393,6 +442,8 @@ export class BrowserWorker {
                     if (endLogLength > startLogLength && result) {
                         result.triggeredEvents = (window as any).__trackingLog.slice(startLogLength);
                     }
+
+                    testedCount++;
                 }
 
                 return results;
