@@ -4,6 +4,7 @@ import type {
   AggregatedIssueSummary,
   IssueSummary as AnalyzerIssueSummary,
 } from '../lib/analyzers/html';
+import type { JsonLdAnalysis } from '../lib/analyzers/jsonld';
 import type { PageWithMetrics } from '../lib/services/scanPages';
 import type { TaskEventMessage } from '../lib/workers/events';
 import type { ScanJobOptions as ScanJobOptionsSchema } from '../lib/db/schema/scan_jobs';
@@ -62,3 +63,6 @@ export const InsertTaskEventSchema = schema.insertTaskEventSchema;
 export type TaskEvent = z.infer<typeof schema.selectTaskEventSchema>;
 export type NewTaskEvent = z.infer<typeof schema.insertTaskEventSchema>;
 export type LiveTaskEvent = TaskEventMessage;
+
+// JSON-LD Analysis
+export type { JsonLdAnalysis } from '../lib/analyzers/jsonld';

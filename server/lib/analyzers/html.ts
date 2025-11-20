@@ -30,6 +30,8 @@ const extractMetaContent = (html: string, name: string) => {
     return extractAttribute(match[0], "content");
 };
 
+import type { JsonLdAnalysis } from "./jsonld.js";
+
 export type SeoAnalysis = {
     title: string | null;
     metaDescription: string | null;
@@ -37,6 +39,7 @@ export type SeoAnalysis = {
     h1: string | null;
     robotsTxtBlocked: boolean;
     schemaOrg: unknown;
+    jsonLdAnalysis?: JsonLdAnalysis; // JSON-LD 详细分析结果
     score: number;
 };
 
@@ -82,6 +85,9 @@ type SeoIssueMap = Record<string, boolean> & {
     missingH1: boolean;
     missingCanonical: boolean;
     robotsBlocked: boolean;
+    jsonLdMissing: boolean;
+    jsonLdInvalid: boolean;
+    jsonLdIncomplete: boolean;
 };
 
 type LinkIssueMap = Record<string, number> & {
@@ -98,6 +104,8 @@ type TrackingIssueMap = Record<string, boolean> & {
 
 type IssueSummaryMeta = {
     seoScore: number;
+    jsonLdScore?: number;
+    jsonLdTypes?: string[];
 };
 
 export type IssueSummary = {
@@ -404,6 +412,9 @@ export const buildIssueSummary = (
         missingH1: !seo.h1,
         missingCanonical: !seo.canonical,
         robotsBlocked: seo.robotsTxtBlocked,
+        jsonLdMissing: !(seo.jsonLdAnalysis?.exists ?? false),
+        jsonLdInvalid: (seo.jsonLdAnalysis?.exists && !seo.jsonLdAnalysis?.isValid) || false,
+        jsonLdIncomplete: (seo.jsonLdAnalysis?.isValid && (seo.jsonLdAnalysis?.score ?? 0) < 70) || false,
     };
 
     const linkMap: LinkIssueMap = {
@@ -432,6 +443,8 @@ export const buildIssueSummary = (
         totals,
         meta: {
             seoScore: seo.score,
+            jsonLdScore: seo.jsonLdAnalysis?.score,
+            jsonLdTypes: seo.jsonLdAnalysis?.types,
         },
     };
 };

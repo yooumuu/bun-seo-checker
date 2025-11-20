@@ -53,6 +53,18 @@ export type PageWithMetrics = {
         robotsTxtBlocked: boolean | null;
         schemaOrg: unknown;
         score: number | null;
+        jsonLdScore: number | null;
+        jsonLdTypes: string[] | null;
+        jsonLdIssues: {
+            errors: string[];
+            warnings: string[];
+            schemas: Array<{
+                type: string;
+                score: number;
+                errors: string[];
+                warnings: string[];
+            }>;
+        } | null;
     } | null;
     links: {
         internalLinks: number | null;
@@ -96,6 +108,9 @@ export const listPagesForJob = async (
                 robotsTxtBlocked: seoMetrics.robotsTxtBlocked,
                 schemaOrg: seoMetrics.schemaOrg,
                 score: seoMetrics.score,
+                jsonLdScore: seoMetrics.jsonLdScore,
+                jsonLdTypes: seoMetrics.jsonLdTypes,
+                jsonLdIssues: seoMetrics.jsonLdIssues,
             },
             linksId: linkMetrics.id,
             links: {
@@ -149,6 +164,9 @@ export const listPagesForJob = async (
                       robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
                       schemaOrg: row.seo?.schemaOrg ?? null,
                       score: row.seo?.score ?? null,
+                      jsonLdScore: row.seo?.jsonLdScore ?? null,
+                      jsonLdTypes: row.seo?.jsonLdTypes ?? null,
+                      jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
                   };
 
         const links =
@@ -202,6 +220,9 @@ export const getPageForJob = async (jobId: number, pageId: number) => {
                 robotsTxtBlocked: seoMetrics.robotsTxtBlocked,
                 schemaOrg: seoMetrics.schemaOrg,
                 score: seoMetrics.score,
+                jsonLdScore: seoMetrics.jsonLdScore,
+                jsonLdTypes: seoMetrics.jsonLdTypes,
+                jsonLdIssues: seoMetrics.jsonLdIssues,
             },
             linksId: linkMetrics.id,
             links: {
@@ -248,6 +269,9 @@ export const getPageForJob = async (jobId: number, pageId: number) => {
                       robotsTxtBlocked: row.seo?.robotsTxtBlocked ?? null,
                       schemaOrg: row.seo?.schemaOrg ?? null,
                       score: row.seo?.score ?? null,
+                      jsonLdScore: row.seo?.jsonLdScore ?? null,
+                      jsonLdTypes: row.seo?.jsonLdTypes ?? null,
+                      jsonLdIssues: row.seo?.jsonLdIssues as any ?? null,
                   },
         links:
             row.linksId === null

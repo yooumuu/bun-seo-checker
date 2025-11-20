@@ -244,6 +244,11 @@ export const scanSinglePage = async (
                 tracking = analyzeTracking(html);
             }
 
+            // 分析 JSON-LD 结构化数据
+            const { analyzeJsonLd } = await import("./jsonld.js");
+            const jsonLdAnalysis = analyzeJsonLd(html);
+            seo.jsonLdAnalysis = jsonLdAnalysis;
+
             const issueSummary = buildIssueSummary(seo, links, tracking);
 
             await tx
@@ -265,6 +270,18 @@ export const scanSinglePage = async (
                 robotsTxtBlocked: seo.robotsTxtBlocked,
                 schemaOrg: seo.schemaOrg,
                 score: seo.score,
+                jsonLdScore: jsonLdAnalysis.score,
+                jsonLdTypes: jsonLdAnalysis.types,
+                jsonLdIssues: {
+                    errors: jsonLdAnalysis.errors,
+                    warnings: jsonLdAnalysis.warnings,
+                    schemas: jsonLdAnalysis.schemas.map(s => ({
+                        type: s.type,
+                        score: s.score,
+                        errors: s.errors,
+                        warnings: s.warnings,
+                    })),
+                },
             });
 
             await tx.insert(linkMetrics).values({
