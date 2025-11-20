@@ -12,6 +12,7 @@ export interface BrowserScanResult {
         visible: boolean;
         heading?: string;
         utmParams: Record<string, string>;
+        selector: string;
     }>;
     trackingEvents: Array<{
         platform: string;
@@ -169,16 +170,48 @@ export class BrowserWorker {
                     return true;
                 };
 
-                const findNearestHeading = (el: Element | null) => {
-                    let current = el;
-                    while (current) {
-                        const prev = current.previousElementSibling;
-                        if (prev && /^H[1-6]$/.test(prev.tagName)) {
-                            return prev.textContent || "";
+                const findNearestHeading = (el: Element | null): string => {
+                    if (!el) return "";
+                    try {
+                        // Find the nearest preceding heading (h1-h6) in document order
+                        // XPath: Select all preceding H tags, or ancestor H tags. Take the last one (closest).
+                        const xpath = "(./preceding::*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6] | ./ancestor::*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6])[last()]";
+                        const result = document.evaluate(xpath, el, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                        const node = result.singleNodeValue;
+                        return node ? node.textContent?.trim() || "" : "";
+                    } catch (e) {
+                        return "";
+                    }
+                };
+
+                const getSelector = (el: Element): string => {
+                    if (el.id) return `#${el.id}`;
+                    if (el === document.body) return 'body';
+
+                    let path = [];
+                    let current: Element | null = el;
+
+                    while (current && current !== document.body) {
+                        let selector = current.tagName.toLowerCase();
+                        if (current.className && typeof current.className === 'string') {
+                            // Use only first class to avoid overly specific selectors that might break
+                            const firstClass = current.className.split(' ')[0];
+                            if (firstClass) selector += `.${firstClass}`;
                         }
+
+                        // Add nth-of-type if needed for uniqueness among siblings
+                        let sibling = current.previousElementSibling;
+                        let index = 1;
+                        while (sibling) {
+                            if (sibling.tagName === current.tagName) index++;
+                            sibling = sibling.previousElementSibling;
+                        }
+                        if (index > 1) selector += `:nth-of-type(${index})`;
+
+                        path.unshift(selector);
                         current = current.parentElement;
                     }
-                    return "";
+                    return path.join(' > ');
                 };
 
                 return anchors.map((anchor) => {
@@ -197,6 +230,7 @@ export class BrowserWorker {
                         visible: isElementVisible(a),
                         heading: findNearestHeading(a),
                         utmParams: params,
+                        selector: getSelector(a),
                     };
                 });
             });

@@ -4,7 +4,7 @@ const canonicalRegex = /<link[^>]+rel=["']canonical["'][^>]*>/i;
 const metaTagRegex = (name: string) =>
     new RegExp(`<meta[^>]+name=["']${name}["'][^>]*>`, "i");
 const ldJsonRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i;
-const anchorRegex = /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi;
+const anchorRegex = /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi;
 
 const decodeHtmlEntities = (value: string) =>
     value
@@ -51,11 +51,13 @@ export type LinkAnalysis = {
         examples: Array<{
             url: string;
             params: string[];
+            text?: string | null;
             heading?: {
                 tag: string | null;
                 text: string | null;
             } | null;
             deviceVariant?: DeviceVariant | null;
+            selector?: string | null;
         }>;
     };
     brokenLinks: number;
@@ -193,6 +195,7 @@ export const analyzeLinks = (
     const examples: Array<{
         url: string;
         params: string[];
+        text?: string | null;
         heading?: { tag: string | null; text: string | null } | null;
         deviceVariant?: DeviceVariant | null;
     }> = [];
@@ -230,6 +233,11 @@ export const analyzeLinks = (
                 (key) => key.toLowerCase().startsWith("utm_")
             );
             const anchorIndex = match.index ?? 0;
+
+            // Extract link text
+            const rawText = match[3] ?? "";
+            const linkText = decodeHtmlEntities(rawText.replace(/<[^>]+>/g, "").trim());
+
             while (
                 headingPointer < headings.length &&
                 headings[headingPointer]!.index <= anchorIndex
@@ -246,6 +254,7 @@ export const analyzeLinks = (
                 examples.push({
                     url: normalized,
                     params: utmParams,
+                    text: linkText || null,
                     heading: currentHeading
                         ? {
                             tag: currentHeading.tag,
@@ -256,6 +265,18 @@ export const analyzeLinks = (
                 });
             } else if (isInternal) {
                 missing += 1;
+                examples.push({
+                    url: normalized,
+                    params: [],
+                    text: linkText || null,
+                    heading: currentHeading
+                        ? {
+                            tag: currentHeading.tag,
+                            text: currentHeading.text || null,
+                        }
+                        : null,
+                    deviceVariant: detectDeviceVariant(match[0]),
+                });
             }
 
             if (isInternal && discoveredInternal.size < 200) {

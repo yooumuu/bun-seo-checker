@@ -172,11 +172,21 @@ export const scanSinglePage = async (
                         examples.push({
                             url: link.url,
                             params: Object.keys(link.utmParams),
+                            text: link.text || null,
                             heading: link.heading ? { tag: null, text: link.heading } : null,
                             deviceVariant: link.deviceVariant,
+                            selector: link.selector,
                         });
                     } else if (isInternal) {
                         missingCount++;
+                        examples.push({
+                            url: link.url,
+                            params: [],
+                            text: link.text || null,
+                            heading: link.heading ? { tag: null, text: link.heading } : null,
+                            deviceVariant: link.deviceVariant,
+                            selector: link.selector,
+                        });
                     }
                 }
 

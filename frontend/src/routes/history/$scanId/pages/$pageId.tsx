@@ -57,7 +57,7 @@ function PageDetailRoute() {
               onClick={() =>
                 navigator.clipboard
                   .writeText(JSON.stringify(page, null, 2))
-                  .catch(() => {})
+                  .catch(() => { })
               }
               className="text-xs font-medium text-slate-500 underline-offset-4 hover:underline"
             >
@@ -86,8 +86,8 @@ function PageDetailRoute() {
                 />
               </dl>
             </Card>
-          <Card title="链接与 UTM">
-            <dl className="space-y-3 text-sm">
+            <Card title="链接与 UTM">
+              <dl className="space-y-3 text-sm">
                 <Field
                   label="内部链接"
                   value={page.links?.internalLinks ?? 0}
@@ -110,12 +110,11 @@ function PageDetailRoute() {
                 />
                 <Field
                   label="跳转 / 异常"
-                  value={`${page.links?.redirects ?? 0} / ${
-                    page.links?.brokenLinks ?? 0
-                  }`}
+                  value={`${page.links?.redirects ?? 0} / ${page.links?.brokenLinks ?? 0
+                    }`}
                 />
               </dl>
-          </Card>
+            </Card>
           </section>
 
           <section className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -231,7 +230,7 @@ const UtmLinkTable = ({
   if (examples.length === 0) {
     return (
       <p className="mt-3 text-sm text-slate-500">
-        未检测到携带 UTM 参数的内部链接。
+        未检测到相关链接。
       </p>
     );
   }
@@ -241,42 +240,87 @@ const UtmLinkTable = ({
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
           <tr>
-            <th className="px-3 py-2">链接</th>
-            <th className="px-3 py-2">所在标题</th>
-            <th className="px-3 py-2">设备</th>
-            <th className="px-3 py-2">UTM 参数</th>
+            <th className="px-3 py-2 w-1/3">链接 / 文本</th>
+            <th className="px-3 py-2 w-1/3">位置定位</th>
+            <th className="px-3 py-2 w-20">设备</th>
+            <th className="px-3 py-2">状态 / 参数</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {examples.map((example) => (
-            <tr key={example.url}>
-              <td className="px-3 py-2 align-top text-slate-900">
-                <a
-                  href={example.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-words text-sky-600 hover:underline"
-                >
-                  {example.url}
-                </a>
-              </td>
-              <td className="px-3 py-2 text-slate-600">
-                {example.heading?.text
-                  ? `${example.heading.tag?.toUpperCase() ?? ''} ${
-                      example.heading.text
-                    }`.trim()
-                  : '未定位'}
-              </td>
-              <td className="px-3 py-2 text-slate-600">
-                {formatDeviceVariant(example.deviceVariant)}
-              </td>
-              <td className="px-3 py-2 text-slate-600">
-                {example.params.length > 0
-                  ? example.params.join(', ')
-                  : '—'}
-              </td>
-            </tr>
-          ))}
+          {examples.map((example, idx) => {
+            const isTracked = example.params.length > 0;
+            return (
+              <tr key={idx}>
+                <td className="px-3 py-2 align-top">
+                  <div className="space-y-1">
+                    <p className="font-medium text-slate-900 break-words">
+                      {example.text || (
+                        <span className="italic text-slate-400">无文本</span>
+                      )}
+                    </p>
+                    <a
+                      href={example.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block break-all text-xs font-mono text-sky-600 hover:underline"
+                    >
+                      {example.url}
+                    </a>
+                  </div>
+                </td>
+                <td className="px-3 py-2 align-top text-slate-600">
+                  <div className="space-y-2">
+                    {example.selector ? (
+                      <div className="group relative">
+                        <code className="block w-full overflow-hidden text-ellipsis rounded bg-slate-100 px-1.5 py-1 font-mono text-xs text-slate-600" title={example.selector}>
+                          {example.selector}
+                        </code>
+                      </div>
+                    ) : null}
+                    {example.heading?.text ? (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <span className="uppercase rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium">
+                          {example.heading.tag || 'H?'}
+                        </span>
+                        <span className="truncate max-w-[200px]" title={example.heading.text}>
+                          {example.heading.text}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="px-3 py-2 align-top text-slate-600">
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                    {formatDeviceVariant(example.deviceVariant)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${isTracked
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-amber-50 text-amber-700'
+                          }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${isTracked ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                        {isTracked ? '已标记' : '未标记'}
+                      </span>
+                    </div>
+                    {isTracked && (
+                      <div className="flex flex-wrap gap-1">
+                        {example.params.map(param => (
+                          <span key={param} className="inline-block rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-500">
+                            {param}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-500">

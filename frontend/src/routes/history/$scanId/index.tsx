@@ -7,7 +7,7 @@ import { formatDateTime, formatDuration, formatPercentage } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import type { ScanIssuesSummary, ScanJob, ScanPageWithMetrics } from '@shared/types';
+import type { ScanIssuesSummary, ScanPageWithMetrics } from '@shared/types';
 
 type DetailSearch = {
   page?: number;
@@ -23,16 +23,16 @@ const sanitizeSearch = (search: Record<string, unknown>): DetailSearch => ({
   q: typeof search.q === 'string' ? search.q : '',
   status:
     search.status === 'pending' ||
-    search.status === 'processing' ||
-    search.status === 'completed' ||
-    search.status === 'failed'
+      search.status === 'processing' ||
+      search.status === 'completed' ||
+      search.status === 'failed'
       ? search.status
       : 'all',
   sort:
     search.sort === 'url' ||
-    search.sort === 'httpStatus' ||
-    search.sort === 'loadTimeMs' ||
-    search.sort === 'seoScore'
+      search.sort === 'httpStatus' ||
+      search.sort === 'loadTimeMs' ||
+      search.sort === 'seoScore'
       ? search.sort
       : 'createdAt',
   direction: search.direction === 'asc' ? 'asc' : 'desc',
@@ -376,34 +376,27 @@ const UtmInlineList = ({
 }) => {
   const examples = summary?.examples ?? [];
   if (examples.length === 0) {
-    return <p className="text-[11px] text-slate-500">暂无 UTM 链接</p>;
+    return <p className="text-[11px] text-slate-500">暂无链接数据</p>;
   }
 
-  const formatHeading = (example: PageUtmSummary['examples'][number]) => {
-    if (!example.heading?.text) return '未定位';
-    const level = example.heading?.tag?.toUpperCase();
-    return `${level ?? ''} ${example.heading.text}`.trim();
-  };
+  const trackedCount = summary?.trackedLinks ?? 0;
+  const missingCount = summary?.missingUtm ?? 0;
 
   return (
-    <ul className="mt-1 space-y-1 text-[11px] text-slate-500">
-      {examples.slice(0, 3).map((example) => (
-        <li key={example.url} className="break-words">
-          {example.deviceVariant ? (
-            <span className="mr-1 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
-              {formatDeviceVariant(example.deviceVariant)}
-            </span>
-          ) : null}
-          <span className="font-medium text-slate-600">
-            {formatHeading(example)}
-          </span>{' '}
-          · {example.url}
-        </li>
-      ))}
-      {examples.length > 3 ? (
-        <li>... 等 {examples.length} 条</li>
-      ) : null}
-    </ul>
+    <div className="mt-1.5 flex flex-wrap gap-2 text-[11px]">
+      {trackedCount > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {trackedCount} 已标记
+        </span>
+      )}
+      {missingCount > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          {missingCount} 未标记
+        </span>
+      )}
+    </div>
   );
 };
 
