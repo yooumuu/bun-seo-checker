@@ -12,6 +12,7 @@ export type TaskEventMessage = {
 };
 
 const emitter = new EventEmitter();
+emitter.setMaxListeners(100);
 
 export const recordTaskEvent = async (
     jobId: number,

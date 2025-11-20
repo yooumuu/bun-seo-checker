@@ -69,6 +69,8 @@ export type TrackingEventAnalysis = {
     platform: string;
     status: string;
     eventName?: string | null;
+    deviceVariant?: DeviceVariant | null;
+    payload?: any;
 };
 
 type SeoIssueMap = Record<string, boolean> & {
@@ -246,9 +248,9 @@ export const analyzeLinks = (
                     params: utmParams,
                     heading: currentHeading
                         ? {
-                              tag: currentHeading.tag,
-                              text: currentHeading.text || null,
-                          }
+                            tag: currentHeading.tag,
+                            text: currentHeading.text || null,
+                        }
                         : null,
                     deviceVariant: detectDeviceVariant(match[0]),
                 });

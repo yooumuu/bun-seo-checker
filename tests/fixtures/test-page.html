@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <script>
+        // Mock Mixpanel
+        window.mixpanel = {
+            track: function(event, props) {
+                console.log("Mixpanel track:", event, props);
+            }
+        };
+        // Mock Gtag
+        window.dataLayer = [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXX');
+    </script>
+</head>
+<body>
+    <h1>Test Heading</h1>
+    <a href="https://example.com?utm_source=test&utm_medium=email">Visible Link with UTM</a>
+    <a href="https://example.com/hidden" style="display:none;">Hidden Link</a>
+    <a href="https://example.com/visible-no-utm">Visible Link No UTM</a>
+    
+    <button id="track-btn" onclick="mixpanel.track('Button Click', { id: 123 })">Track Event</button>
+    <script>
+        // Trigger event on load
+        mixpanel.track('Page View', { page: 'home' });
+        setTimeout(() => {
+            document.getElementById('track-btn').click();
+        }, 500);
+    </script>
+</body>
+</html>

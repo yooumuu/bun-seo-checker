@@ -125,11 +125,16 @@ const app = new Hono()
                         .writeSSE({
                             data: JSON.stringify({ type: "event", event }),
                         })
-                        .catch(() => {});
+                        .catch(() => { });
                 });
 
                 stream.onAbort(() => {
                     unsubscribe();
+                });
+
+                // Keep the connection open
+                await new Promise((resolve) => {
+                    stream.onAbort(() => resolve(true));
                 });
             });
         }

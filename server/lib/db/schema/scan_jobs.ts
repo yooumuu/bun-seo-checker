@@ -32,6 +32,7 @@ export const scanPages = pgTable("scan_pages", {
     httpStatus: integer("http_status"),
     loadTimeMs: integer("load_time_ms"),
     issueCounts: jsonb("issue_counts"),
+    deviceVariant: text("device_variant").default("desktop"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
     jobIdIdx: index("scan_pages_job_id_idx").on(table.jobId),
@@ -70,6 +71,8 @@ export const trackingEvents = pgTable("tracking_events", {
     trigger: text("trigger"),
     eventName: text("event_name"),
     platform: text("platform"), // mixpanel, ga, etc.
+    deviceVariant: text("device_variant").default("desktop"),
+    payload: jsonb("payload"),
     status: text("status"),
 }, (table) => ({
     pageIdIdx: index("tracking_events_page_id_idx").on(table.pageId),
