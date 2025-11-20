@@ -32,11 +32,317 @@ const extractMetaContent = (html: string, name: string) => {
 
 import type { JsonLdAnalysis } from "./jsonld.js";
 
+/**
+ * 从文本中提取关键词（简单实现：排除停用词）
+ */
+const extractKeywords = (text: string): string[] => {
+    const stopWords = new Set([
+        // 英文停用词
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in',
+        'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with',
+        // 中文停用词
+        '的', '了', '和', '是', '在', '有', '我', '这', '个', '你', '们'
+    ]);
+
+    return text
+        .toLowerCase()
+        .split(/[\s\-_,;:]+/)
+        .filter(word => word.length > 2 && !stopWords.has(word));
+};
+
+/**
+ * 计算两个词组之间的关键词重叠度
+ */
+const calculateKeywordOverlap = (keywords1: string[], keywords2: string[]): number => {
+    if (keywords1.length === 0 || keywords2.length === 0) return 0;
+
+    const set1 = new Set(keywords1);
+    const commonCount = keywords2.filter(word => set1.has(word)).length;
+
+    return commonCount / Math.max(keywords1.length, keywords2.length);
+};
+
+/**
+ * 检查是否为通用无价值词汇
+ */
+const isGenericContent = (text: string): boolean => {
+    const genericPatterns = [
+        // 单一通用词
+        /^(home|about|contact|blog|news|welcome|page|main|index|untitled|test)$/i,
+        // 纯数字或符号
+        /^[\d\s\-_.,!?]+$/,
+        // 纯emoji或特殊字符
+        /^[\u{1F300}-\u{1F9FF}\s]+$/u,
+    ];
+
+    return genericPatterns.some(pattern => pattern.test(text.trim()));
+};
+
+/**
+ * 评估关键词策略质量 (0-25分)
+ */
+const evaluateKeywordStrategy = (h1: string, title: string | null, plainText: string): { score: number; issues: string[] } => {
+    const issues: string[] = [];
+    let score = 25;
+
+    if (!title) {
+        // 没有title无法评估关键词相关性，给中等分
+        return { score: 15, issues: ['缺少Title标签，无法评估关键词相关性'] };
+    }
+
+    const h1Keywords = extractKeywords(plainText);
+    const titleKeywords = extractKeywords(title.replace(/<[^>]+>/g, ''));
+
+    // 1. 是否包含Title中的核心关键词 (10分)
+    const keywordOverlap = calculateKeywordOverlap(h1Keywords, titleKeywords);
+
+    if (keywordOverlap === 0) {
+        score -= 10;
+        issues.push('H1未包含Title中的任何关键词');
+    } else if (keywordOverlap < 0.3) {
+        score -= 6;
+        issues.push('H1与Title的关键词相关性较低');
+    } else if (keywordOverlap < 0.5) {
+        score -= 3;
+        issues.push('H1与Title的关键词相关性一般');
+    }
+
+    // 2. 关键词位置检查 (5分) - 关键词应该靠前
+    if (h1Keywords.length > 0 && titleKeywords.length > 0) {
+        const firstKeyword = titleKeywords[0];
+        const h1Words = plainText.toLowerCase().split(/\s+/);
+        const keywordPosition = h1Words.findIndex(word => word.includes(firstKeyword!));
+
+        if (keywordPosition > 5) {
+            score -= 3;
+            issues.push('主要关键词位置过于靠后，建议放在H1前部');
+        } else if (keywordPosition > 2) {
+            score -= 1;
+        }
+    }
+
+    // 3. 关键词密度检查 (5分) - 避免堆砌
+    const wordCount = plainText.split(/\s+/).length;
+    if (wordCount > 0) {
+        const keywordDensity = h1Keywords.length / wordCount;
+
+        if (keywordDensity > 0.8) {
+            score -= 5;
+            issues.push('疑似关键词堆砌，影响用户体验和SEO');
+        } else if (keywordDensity < 0.3) {
+            score -= 2;
+            issues.push('关键词密度过低，SEO价值有限');
+        }
+    }
+
+    // 4. 长尾关键词检查 (5分)
+    const hasLongTailKeywords = h1Keywords.length >= 3;
+    if (!hasLongTailKeywords) {
+        score -= 3;
+        issues.push('缺少长尾关键词，建议添加具体描述');
+    }
+
+    return { score: Math.max(score, 0), issues };
+};
+
+/**
+ * 评估内容质量 (0-20分)
+ */
+const evaluateContentQuality = (plainText: string): { score: number; issues: string[] } => {
+    const issues: string[] = [];
+    let score = 20;
+
+    // 1. 通用词检查 (8分)
+    if (isGenericContent(plainText)) {
+        score -= 8;
+        issues.push(`H1内容过于通用（"${plainText}"），缺乏描述性和SEO价值`);
+    }
+
+    // 2. 语义完整性 (6分) - 是否是完整的短语/句子
+    const words = plainText.split(/\s+/).filter(Boolean);
+    if (words.length < 2) {
+        score -= 6;
+        issues.push('H1内容不构成完整短语，建议添加修饰词');
+    } else if (words.length < 3) {
+        score -= 3;
+        issues.push('H1内容较简单，建议增加描述性词汇');
+    }
+
+    // 3. 信息价值 (6分) - 是否传达核心价值
+    const hasActionWords = /\b(get|find|learn|discover|explore|buy|read|watch|download|free|best|top|guide|how|tips)\b/i.test(plainText);
+    const hasValueIndicators = /\b(latest|new|breaking|exclusive|official|complete|ultimate|comprehensive)\b/i.test(plainText);
+
+    if (!hasActionWords && !hasValueIndicators) {
+        score -= 4;
+        issues.push('H1缺少行动词或价值指标，建议添加以提升吸引力');
+    }
+
+    return { score: Math.max(score, 0), issues };
+};
+
+/**
+ * 评估用户体验 (0-15分)
+ */
+const evaluateUserExperience = (plainText: string): { score: number; issues: string[] } => {
+    const issues: string[] = [];
+    let score = 15;
+
+    // 1. 可读性 (6分)
+    const hasRepeatedWords = /\b(\w+)\b.*\b\1\b/i.test(plainText);
+    if (hasRepeatedWords) {
+        score -= 3;
+        issues.push('H1包含重复词汇，影响可读性');
+    }
+
+    const hasExcessiveCaps = (plainText.match(/[A-Z]/g) || []).length / plainText.length > 0.5;
+    if (hasExcessiveCaps && plainText.length > 10) {
+        score -= 2;
+        issues.push('H1全大写或大写过多，降低可读性');
+    }
+
+    // 2. 吸引力 (5分) - 是否能吸引用户点击
+    const hasBrandAndValue = plainText.includes('-') || plainText.includes(':') || plainText.includes('|');
+    if (!hasBrandAndValue && plainText.split(/\s+/).length < 4) {
+        score -= 3;
+        issues.push('H1缺少品牌+价值组合，吸引力不足');
+    }
+
+    // 3. 清晰度 (4分)
+    const specialCharRatio = (plainText.match(/[^a-zA-Z0-9\s\u4e00-\u9fa5\-:,|.]/g) || []).length / plainText.length;
+    if (specialCharRatio > 0.3) {
+        score -= 4;
+        issues.push('H1包含过多特殊字符或符号，影响清晰度');
+    }
+
+    return { score: Math.max(score, 0), issues };
+};
+
+/**
+ * 评估 H1 标签内容质量（专业SEO标准）
+ * @param h1 H1 标签文本内容
+ * @param title 页面标题（用于关键词分析）
+ * @returns { score: 0-100, issues: string[] | undefined, breakdown: object }
+ */
+const evaluateH1Quality = (h1: string | null, title: string | null): {
+    score: number;
+    issues?: string[];
+    breakdown?: {
+        existence: number;
+        length: number;
+        keywordStrategy: number;
+        contentQuality: number;
+        userExperience: number;
+        technicalImpl: number;
+    };
+} => {
+    const issues: string[] = [];
+
+    // 1. 存在性检查 (15分)
+    if (!h1) {
+        return {
+            score: 0,
+            issues: ['H1标签不存在（严重SEO问题）'],
+            breakdown: {
+                existence: 0,
+                length: 0,
+                keywordStrategy: 0,
+                contentQuality: 0,
+                userExperience: 0,
+                technicalImpl: 0,
+            }
+        };
+    }
+
+    let existenceScore = 15;
+    const trimmedH1 = h1.trim();
+
+    // 2. 技术实现检查 (10分)
+    let technicalScore = 10;
+    const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(h1);
+    const hasImage = /<img[\s\S]*?>/i.test(h1);
+
+    if (hasSvg || hasImage) {
+        technicalScore -= 8;
+        issues.push('使用SVG/图片而非纯文本（搜索引擎识别度低，扣8分）');
+    }
+
+    const hasExcessiveNesting = (h1.match(/<[^>]+>/g) || []).length > 3;
+    if (hasExcessiveNesting) {
+        technicalScore -= 2;
+        issues.push('HTML嵌套过深，建议简化结构');
+    }
+
+    // 提取纯文本
+    const plainText = trimmedH1.replace(/<[^>]+>/g, '').trim();
+    const plainLength = plainText.length;
+
+    if (plainLength === 0) {
+        return {
+            score: 0,
+            issues: ['H1标签为空（严重SEO问题）'],
+            breakdown: {
+                existence: 0,
+                length: 0,
+                keywordStrategy: 0,
+                contentQuality: 0,
+                userExperience: 0,
+                technicalImpl: 0,
+            }
+        };
+    }
+
+    // 3. 长度优化 (15分)
+    let lengthScore = 15;
+
+    if (plainLength < 10) {
+        lengthScore -= 12;
+        issues.push(`H1过短（${plainLength}字符），SEO价值极低，建议20-70字符`);
+    } else if (plainLength < 20) {
+        lengthScore -= 6;
+        issues.push(`H1偏短（${plainLength}字符），建议20-70字符`);
+    } else if (plainLength > 100) {
+        lengthScore -= 8;
+        issues.push(`H1过长（${plainLength}字符），移动端显示可能截断`);
+    } else if (plainLength > 70) {
+        lengthScore -= 3;
+        issues.push(`H1偏长（${plainLength}字符），建议控制在70字符内`);
+    }
+
+    // 4. 关键词策略 (25分) - 最重要
+    const keywordEval = evaluateKeywordStrategy(h1, title, plainText);
+    issues.push(...keywordEval.issues);
+
+    // 5. 内容质量 (20分)
+    const contentEval = evaluateContentQuality(plainText);
+    issues.push(...contentEval.issues);
+
+    // 6. 用户体验 (15分)
+    const uxEval = evaluateUserExperience(plainText);
+    issues.push(...uxEval.issues);
+
+    const totalScore = existenceScore + lengthScore + keywordEval.score + contentEval.score + uxEval.score + technicalScore;
+
+    return {
+        score: Math.max(Math.min(totalScore, 100), 0),
+        issues: issues.length > 0 ? issues : undefined,
+        breakdown: {
+            existence: existenceScore,
+            length: lengthScore,
+            keywordStrategy: keywordEval.score,
+            contentQuality: contentEval.score,
+            userExperience: uxEval.score,
+            technicalImpl: technicalScore,
+        }
+    };
+};
+
 export type SeoAnalysis = {
     title: string | null;
     metaDescription: string | null;
     canonical: string | null;
     h1: string | null;
+    h1Score?: number; // H1 质量评分 (0-100)
+    h1Issues?: string[]; // H1 存在的问题
     robotsTxtBlocked: boolean;
     schemaOrg: unknown;
     jsonLdAnalysis?: JsonLdAnalysis; // JSON-LD 详细分析结果
@@ -166,10 +472,22 @@ export const analyzeSeo = (html: string): SeoAnalysis => {
     const robotsTxtBlocked =
         robotsMeta?.toLowerCase().includes("noindex") ?? false;
 
+    // 评估 H1 质量
+    const h1Evaluation = evaluateH1Quality(h1, title);
+
     let score = 100;
     if (!title) score -= 30;
     if (!metaDescription) score -= 20;
-    if (!h1) score -= 20;
+
+    // H1 评分：根据质量评分动态扣分
+    // H1Score 100 = 不扣分
+    // H1Score 80 = 扣 4 分
+    // H1Score 60 = 扣 8 分
+    // H1Score 40 = 扣 12 分
+    // H1Score 0 = 扣 20 分
+    const h1Penalty = Math.round((100 - h1Evaluation.score) * 0.2);
+    score -= h1Penalty;
+
     if (!canonical) score -= 10;
     if (robotsTxtBlocked) score -= 20;
     if (!schemaOrg) score -= 5;
@@ -179,6 +497,8 @@ export const analyzeSeo = (html: string): SeoAnalysis => {
         metaDescription,
         canonical,
         h1,
+        h1Score: h1Evaluation.score,
+        h1Issues: h1Evaluation.issues && h1Evaluation.issues.length > 0 ? h1Evaluation.issues : undefined,
         robotsTxtBlocked,
         schemaOrg,
         score: Math.max(score, 0),
