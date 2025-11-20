@@ -63,6 +63,8 @@ export type PageWithMetrics = {
                 score: number;
                 errors: string[];
                 warnings: string[];
+                requiredFields: Record<string, boolean>;
+                recommendedFields: Record<string, boolean>;
             }>;
         } | null;
     } | null;

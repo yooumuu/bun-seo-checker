@@ -128,37 +128,88 @@ function PageDetailRoute() {
                 {/* JSON-LD 部分 */}
                 {page.seo && (
                   <div className="mt-4 border-t border-slate-100 pt-4">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-medium text-slate-500">JSON-LD 结构化数据</span>
                       {page.seo.jsonLdScore !== null && page.seo.jsonLdScore !== undefined ? (
                         <div className="flex items-center gap-2">
-                          {page.seo.jsonLdScore >= 70 ? (
-                            <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : page.seo.jsonLdScore >= 40 ? (
-                            <svg className="h-4 w-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          )}
-                          <span className={`text-sm font-semibold ${
-                            page.seo.jsonLdScore >= 70 ? 'text-emerald-600' :
-                            page.seo.jsonLdScore >= 40 ? 'text-amber-600' : 'text-rose-600'
-                          }`}>
+                          <span className={`text-sm font-semibold ${page.seo.jsonLdScore >= 70 ? 'text-emerald-600' :
+                              page.seo.jsonLdScore >= 40 ? 'text-amber-600' : 'text-rose-600'
+                            }`}>
                             {page.seo.jsonLdScore}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-rose-500">未检测到</span>
+                        <span className="text-xs text-slate-400">未检测到</span>
                       )}
                     </div>
 
-                    {page.seo.jsonLdTypes && page.seo.jsonLdTypes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
+                    {/* Schema 列表 */}
+                    {page.seo.jsonLdIssues?.schemas && page.seo.jsonLdIssues.schemas.length > 0 ? (
+                      <div className="space-y-2">
+                        {page.seo.jsonLdIssues.schemas.map((schema: any, idx: number) => (
+                          <details key={idx} className="group">
+                            <summary className="flex items-center justify-between cursor-pointer rounded-lg bg-slate-50 px-3 py-2 hover:bg-slate-100 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  {schema.type}
+                                </span>
+                                <span className={`text-xs font-medium ${schema.score >= 70 ? 'text-emerald-600' :
+                                    schema.score >= 40 ? 'text-amber-600' : 'text-rose-600'
+                                  }`}>
+                                  {schema.score}
+                                </span>
+                              </div>
+                              <svg className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </summary>
+
+                            <div className="mt-2 px-3 py-2 bg-white rounded-lg border border-slate-100 space-y-3">
+                              {/* 必需字段 */}
+                              {schema.requiredFields && Object.keys(schema.requiredFields).length > 0 && (
+                                <div>
+                                  <div className="text-xs font-medium text-slate-700 mb-1.5">必需字段</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(schema.requiredFields).map(([field, exists]: [string, any]) => (
+                                      <span
+                                        key={field}
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${exists
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                          }`}
+                                      >
+                                        {exists ? '✓' : '✗'} {field}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 推荐字段 */}
+                              {schema.recommendedFields && Object.keys(schema.recommendedFields).length > 0 && (
+                                <div>
+                                  <div className="text-xs font-medium text-slate-700 mb-1.5">推荐字段</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(schema.recommendedFields).map(([field, exists]: [string, any]) => (
+                                      <span
+                                        key={field}
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${exists
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                          }`}
+                                      >
+                                        {exists ? '✓' : '○'} {field}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    ) : page.seo.jsonLdTypes && page.seo.jsonLdTypes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
                         {page.seo.jsonLdTypes.map((type: string) => (
                           <span
                             key={type}
@@ -168,38 +219,18 @@ function PageDetailRoute() {
                           </span>
                         ))}
                       </div>
-                    )}
+                    ) : null}
 
-                    {page.seo.jsonLdIssues && (
-                      <div className="space-y-2">
-                        {page.seo.jsonLdIssues.errors && page.seo.jsonLdIssues.errors.length > 0 && (
-                          <div className="rounded-lg bg-rose-50 p-2 border border-rose-200">
-                            <div className="text-xs font-medium text-rose-800 mb-1">错误</div>
-                            <ul className="text-xs text-rose-600 space-y-0.5">
-                              {page.seo.jsonLdIssues.errors.slice(0, 3).map((err: string, i: number) => (
-                                <li key={i}>• {err}</li>
-                              ))}
-                              {page.seo.jsonLdIssues.errors.length > 3 && (
-                                <li className="text-rose-500">还有 {page.seo.jsonLdIssues.errors.length - 3} 个错误...</li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-
-                        {page.seo.jsonLdIssues.warnings && page.seo.jsonLdIssues.warnings.length > 0 && (
-                          <div className="rounded-lg bg-amber-50 p-2 border border-amber-200">
-                            <div className="text-xs font-medium text-amber-800 mb-1">警告</div>
-                            <ul className="text-xs text-amber-600 space-y-0.5">
-                              {page.seo.jsonLdIssues.warnings.slice(0, 3).map((warn: string, i: number) => (
-                                <li key={i}>• {warn}</li>
-                              ))}
-                              {page.seo.jsonLdIssues.warnings.length > 3 && (
-                                <li className="text-amber-500">还有 {page.seo.jsonLdIssues.warnings.length - 3} 个警告...</li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
+                    {/* 原始数据查看 */}
+                    {!!page.seo.schemaOrg && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700">
+                          查看原始 JSON-LD
+                        </summary>
+                        <pre className="mt-2 text-xs bg-slate-900 text-slate-100 p-3 rounded overflow-x-auto max-h-60">
+                          {JSON.stringify(page.seo.schemaOrg, null, 2)}
+                        </pre>
+                      </details>
                     )}
                   </div>
                 )}
@@ -520,12 +551,12 @@ const UtmLinkTable = ({
                             <span
                               key={platform}
                               className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${platform === 'mixpanel'
-                                  ? 'bg-purple-100 text-purple-700'
-                                  : platform === 'dataLayer'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : platform === 'gtag'
-                                      ? 'bg-green-100 text-green-700'
-                                      : 'bg-orange-100 text-orange-700'
+                                ? 'bg-purple-100 text-purple-700'
+                                : platform === 'dataLayer'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : platform === 'gtag'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-orange-100 text-orange-700'
                                 }`}
                             >
                               {platform}

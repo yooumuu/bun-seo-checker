@@ -280,6 +280,8 @@ export const scanSinglePage = async (
                         score: s.score,
                         errors: s.errors,
                         warnings: s.warnings,
+                        requiredFields: s.requiredFields,
+                        recommendedFields: s.recommendedFields,
                     })),
                 },
             });
