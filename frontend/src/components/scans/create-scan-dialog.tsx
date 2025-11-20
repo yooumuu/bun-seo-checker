@@ -4,6 +4,7 @@ import type { ScanJob } from '@shared/types';
 import { cn } from '@/lib/utils';
 import { X, Loader2, Globe, FileText, Settings2 } from 'lucide-react';
 import { useState } from 'react';
+import { ScanTrackingModal } from './scan-tracking-modal';
 
 type FormValues = {
     targetUrl: string;
@@ -23,6 +24,7 @@ interface CreateScanDialogProps {
 
 export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [trackingScanId, setTrackingScanId] = useState<number | null>(null);
     const createMutation = useCreateScanMutation();
 
     const form = useForm({
@@ -43,7 +45,7 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                     ([, v]) => v !== undefined && v !== null && v !== ''
                 )
             );
-            await createMutation.mutateAsync({
+            const result = await createMutation.mutateAsync({
                 targetUrl,
                 mode,
                 options:
@@ -53,16 +55,29 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
             });
             form.reset();
             onClose();
+            // Open tracking modal with the newly created scan
+            setTrackingScanId(result.id);
         },
     });
 
     const canSubmit = useStore(form.store, (state) => state.canSubmit);
     const modeValue = useStore(form.store, (state) => state.values.mode);
 
-    if (!isOpen) return null;
+    if (!isOpen) return (
+        <>
+            {trackingScanId && (
+                <ScanTrackingModal
+                    scanId={trackingScanId}
+                    isOpen={true}
+                    onClose={() => setTrackingScanId(null)}
+                />
+            )}
+        </>
+    );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
@@ -168,7 +183,7 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                                                         type="number"
                                                         min={1}
                                                         max={10}
-                                                        value={field.state.value ?? 2}
+                                                        value={field.state.value ?? 1}
                                                         onChange={(e) => field.handleChange((e.target.valueAsNumber || undefined) as any)}
                                                         disabled={modeValue === 'single'}
                                                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
@@ -243,5 +258,13 @@ export function CreateScanDialog({ isOpen, onClose }: CreateScanDialogProps) {
                 </form>
             </div>
         </div>
+        {trackingScanId && (
+            <ScanTrackingModal
+                scanId={trackingScanId}
+                isOpen={true}
+                onClose={() => setTrackingScanId(null)}
+            />
+        )}
+    </>
     );
 }

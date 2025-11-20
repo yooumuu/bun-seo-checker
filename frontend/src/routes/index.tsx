@@ -4,6 +4,7 @@ import { getScansQueryOptions } from '@/lib/api/scans';
 import { useState } from 'react';
 import { CreateScanDialog } from '@/components/scans/create-scan-dialog';
 import { ScanCard } from '@/components/scans/scan-card';
+import { ScanTrackingModal } from '@/components/scans/scan-tracking-modal';
 import { Plus, ArrowRight, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const Route = createFileRoute('/')({
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/')({
 
 function HomeRoute() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [trackingScanId, setTrackingScanId] = useState<number | null>(null);
   const recentScans = useQuery(
     getScansQueryOptions({ limit: 6, sort: 'createdAt', direction: 'desc' })
   );
@@ -125,7 +127,15 @@ function HomeRoute() {
             </div>
           ) : (
             recentScans.data?.jobs.map((job) => (
-              <ScanCard key={job.id} job={job} />
+              <ScanCard
+                key={job.id}
+                job={job}
+                onClick={
+                  job.status === 'running' || job.status === 'pending'
+                    ? () => setTrackingScanId(job.id)
+                    : undefined
+                }
+              />
             ))
           )}
         </div>
@@ -135,6 +145,13 @@ function HomeRoute() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
+      {trackingScanId && (
+        <ScanTrackingModal
+          scanId={trackingScanId}
+          isOpen={true}
+          onClose={() => setTrackingScanId(null)}
+        />
+      )}
     </div>
   );
 }
